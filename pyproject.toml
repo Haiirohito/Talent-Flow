@@ -4,4 +4,34 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "alembic>=1.18.4",
+    "emails>=1.1.2",
+    "fastapi[standard]>=0.137.1",
+    "jinja2>=3.1.6",
+    "psycopg[binary]>=3.3.4",
+    "pwdlib[argon2,bcrypt]>=0.3.0",
+    "pydantic>=2.13.4",
+    "pyjwt>=2.13.0",
+    "sqlmodel>=0.0.38",
+    "tenacity>=9.1.4",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+src = ["backend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "S", "B", "A", "LOG", "G", "TRY", "RET"]
+ignore = [
+    "RET504",   # Unnecessary assignment before return — improves readability
+    "TRY003",   # Long exception messages — acceptable for HTTP errors
+    "UP017",    # timezone.utc → datetime.UTC — codebase uses from-import style
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/app/alembic/**" = ["E", "F", "I", "UP", "W"]  # Auto-generated alembic files
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
