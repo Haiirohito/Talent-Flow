@@ -7,6 +7,11 @@ from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.permissions import Permission, UserRole, require_permissions
 from app.core.security import get_password_hash, verify_password
+from app.email.services import (
+    generate_invitation_email,
+    generate_new_account_email,
+    send_email,
+)
 from app.users import crud
 from app.users.models import (
     InvitationCreate,
@@ -21,13 +26,7 @@ from app.users.models import (
     UserUpdate,
     UserUpdateMe,
 )
-from app.utils import (
-    generate_invitation_email,
-    generate_invitation_token,
-    generate_new_account_email,
-    send_email,
-    verify_invitation_token,
-)
+from app.utils import generate_invitation_token, verify_invitation_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 

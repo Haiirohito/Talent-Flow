@@ -10,38 +10,29 @@ from app.auth import utils
 from app.core import security
 from app.core.config import settings
 from app.core.permissions import Permission, require_permissions
-from app.users import crud
-from app.users.models import Message, NewPassword, Token, UserPublic, UserUpdate
-from app.utils import (
-    generate_password_reset_token,
+from app.email.services import (
     generate_reset_password_email,
     send_email,
-    verify_password_reset_token,
 )
+from app.users import crud
+from app.users.models import Message, NewPassword, Token, UserPublic, UserUpdate
+from backend.app.utils import generate_password_reset_token, verify_password_reset_token
 
 router = APIRouter(tags=["login"])
 
 
 @router.post("/login/access-token")
-def login_access_token(
-    session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
-) -> Token:
+def login_access_token(session: SessionDep, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    user = utils.authenticate(
-        session=session, email=form_data.username, password=form_data.password
-    )
+    user = utils.authenticate(session=session, email=form_data.username, password=form_data.password)
     if not user:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    return Token(
-        access_token=security.create_access_token(
-            user.id, expires_delta=access_token_expires
-        )
-    )
+    return Token(access_token=security.create_access_token(user.id, expires_delta=access_token_expires))
 
 
 @router.post("/login/test-token", response_model=UserPublic)
@@ -63,17 +54,13 @@ def recover_password(email: str, session: SessionDep) -> Message:
     # Only send email if user actually exists
     if user:
         password_reset_token = generate_password_reset_token(email=email)
-        email_data = generate_reset_password_email(
-            email_to=user.email, email=email, token=password_reset_token
-        )
+        email_data = generate_reset_password_email(email_to=user.email, email=email, token=password_reset_token)
         send_email(
             email_to=user.email,
             subject=email_data.subject,
             html_content=email_data.html_content,
         )
-    return Message(
-        message="If that email is registered, we sent a password recovery link"
-    )
+    return Message(message="If that email is registered, we sent a password recovery link")
 
 
 @router.post("/reset-password/")
@@ -116,10 +103,6 @@ def recover_password_html_content(email: str, session: SessionDep) -> Any:
             detail="The user with this username does not exist in the system.",
         )
     password_reset_token = generate_password_reset_token(email=email)
-    email_data = generate_reset_password_email(
-        email_to=user.email, email=email, token=password_reset_token
-    )
+    email_data = generate_reset_password_email(email_to=user.email, email=email, token=password_reset_token)
 
-    return HTMLResponse(
-        content=email_data.html_content, headers={"subject": email_data.subject}
-    )
+    return HTMLResponse(content=email_data.html_content, headers={"subject": email_data.subject})
