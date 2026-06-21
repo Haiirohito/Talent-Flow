@@ -1,19 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  Card,
-  CardBody,
-  Center,
-  Container,
-  FormControl,
-  FormLabel,
-  Heading,
-  Input,
-  VStack,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
 import { useAuth } from '../components/AuthContext';
 import { fetchApi } from '../api/client';
 
@@ -50,61 +36,52 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Center minH="calc(100vh - 80px)" bg="gray.50">
-      <Container maxW="sm">
-        <Card>
-          <CardBody>
-            <VStack spacing={6}>
-              <Heading textAlign="center">Welcome Back</Heading>
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">TalentFlow</div>
+        <p className="login-subtitle">Sign in to your account</p>
 
-              {error && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  {error}
-                </Alert>
-              )}
+        {error && <div className="alert alert-error">{error}</div>}
 
-              <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-                <VStack spacing={4}>
-                  <FormControl isRequired>
-                    <FormLabel>Email</FormLabel>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                      size="lg"
-                    />
-                  </FormControl>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              className="form-input"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              required
+              autoFocus
+            />
+          </div>
 
-                  <FormControl isRequired>
-                    <FormLabel>Password</FormLabel>
-                    <Input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter your password"
-                      size="lg"
-                    />
-                  </FormControl>
+          <div className="form-group">
+            <label className="form-label" htmlFor="login-password">Password</label>
+            <input
+              id="login-password"
+              className="form-input"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              required
+            />
+          </div>
 
-                  <Button
-                    type="submit"
-                    colorScheme="blue"
-                    width="full"
-                    size="lg"
-                    isLoading={isLoading}
-                    loadingText="Signing in..."
-                  >
-                    Sign In
-                  </Button>
-                </VStack>
-              </form>
-            </VStack>
-          </CardBody>
-        </Card>
-      </Container>
-    </Center>
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={isLoading}
+            style={{ marginTop: 4 }}
+          >
+            {isLoading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 };
 

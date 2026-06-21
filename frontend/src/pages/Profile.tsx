@@ -1,23 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Button,
-  Card,
-  CardBody,
-  Container,
-  FormControl,
-  FormLabel,
-  Heading,
-  Input,
-  SimpleGrid,
-  VStack,
-  Alert,
-  AlertIcon,
-} from '@chakra-ui/react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
 import { fetchApi } from '../api/client';
 
 const Profile: React.FC = () => {
-  const { user, login } = useAuth();
+  const { user, login, logout, hasPermission, permissions, refreshUser } = useAuth();
+  const navigate = useNavigate();
+
   const [fullName, setFullName] = useState(user?.full_name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [message, setMessage] = useState('');
@@ -27,6 +16,9 @@ const Profile: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [pwdMessage, setPwdMessage] = useState('');
   const [pwdError, setPwdError] = useState('');
+
+  const canUpdate = hasPermission('profile:update');
+  const canDelete = hasPermission('profile:delete');
 
   useEffect(() => {
     if (user) {
@@ -41,13 +33,9 @@ const Profile: React.FC = () => {
     setError('');
 
     try {
-      const data = {
-        full_name: fullName,
-        email: email,
-      };
       await fetchApi('/users/me', {
         method: 'PATCH',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ full_name: fullName, email }),
       });
       setMessage('Profile updated successfully');
       const token = localStorage.getItem('access_token');
@@ -63,13 +51,12 @@ const Profile: React.FC = () => {
     setPwdError('');
 
     try {
-      const data = {
-        current_password: currentPassword,
-        new_password: newPassword,
-      };
       await fetchApi('/users/me/password', {
         method: 'PATCH',
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
       });
       setPwdMessage('Password updated successfully');
       setCurrentPassword('');
@@ -79,111 +66,188 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) return;
+    try {
+      await fetchApi('/users/me', { method: 'DELETE' });
+      logout();
+      navigate('/login');
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete account');
+    }
+  };
+
   return (
-    <Container maxW="container.lg" py={8}>
-      <Heading mb={8}>Profile</Heading>
+    <>
+      <header className="top-header">
+        <span className="top-header-title">Profile</span>
+        <div className="top-header-actions">
+          <span className={`badge ${user?.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
+            {user?.role?.replace('_', ' ')}
+          </span>
+        </div>
+      </header>
 
-      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-        {/* Personal Information Form */}
-        <Card bg="white" boxShadow="sm">
-          <CardBody>
-            <VStack spacing={6} align="start" width="full">
-              <Heading size="md">Personal Information</Heading>
+      <div className="page-content">
+        {/* Profile Info Card */}
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-header">
+            <span className="card-title">Account Overview</span>
+          </div>
+          <div className="grid-2">
+            <div>
+              <div className="form-group">
+                <span className="form-label">Full Name</span>
+                <span>{user?.full_name || '—'}</span>
+              </div>
+              <div className="form-group">
+                <span className="form-label">Email</span>
+                <span>{user?.email}</span>
+              </div>
+            </div>
+            <div>
+              <div className="form-group">
+                <span className="form-label">Role</span>
+                <span style={{ textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ')}</span>
+              </div>
+              <div className="form-group">
+                <span className="form-label">Status</span>
+                <span className={`badge ${user?.is_active ? 'badge-active' : 'badge-inactive'}`}>
+                  {user?.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              {message && (
-                <Alert status="success" borderRadius="md">
-                  <AlertIcon />
-                  {message}
-                </Alert>
+        <div className="grid-2">
+          {/* Edit Personal Information */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Personal Information</span>
+            </div>
+
+            {message && <div className="alert alert-success">{message}</div>}
+            {error && <div className="alert alert-error">{error}</div>}
+
+            <form onSubmit={handleUpdateProfile}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="profile-name">Full Name</label>
+                <input
+                  id="profile-name"
+                  className="form-input"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  disabled={!canUpdate}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="profile-email">Email</label>
+                <input
+                  id="profile-email"
+                  className="form-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={!canUpdate}
+                />
+              </div>
+              {canUpdate && (
+                <button type="submit" className="btn btn-primary btn-block">
+                  Save Changes
+                </button>
               )}
-              {error && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  {error}
-                </Alert>
+              {!canUpdate && (
+                <p className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 8 }}>
+                  You don't have permission to edit your profile.
+                </p>
               )}
+            </form>
+          </div>
 
-              <form onSubmit={handleUpdateProfile} style={{ width: '100%' }}>
-                <VStack spacing={4}>
-                  <FormControl isRequired>
-                    <FormLabel>Full Name</FormLabel>
-                    <Input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      size="lg"
-                    />
-                  </FormControl>
+          {/* Change Password */}
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">Change Password</span>
+            </div>
 
-                  <FormControl isRequired>
-                    <FormLabel>Email</FormLabel>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      size="lg"
-                    />
-                  </FormControl>
+            {pwdMessage && <div className="alert alert-success">{pwdMessage}</div>}
+            {pwdError && <div className="alert alert-error">{pwdError}</div>}
 
-                  <Button type="submit" colorScheme="blue" width="full" size="lg">
-                    Save Changes
-                  </Button>
-                </VStack>
-              </form>
-            </VStack>
-          </CardBody>
-        </Card>
-
-        {/* Change Password Form */}
-        <Card bg="white" boxShadow="sm">
-          <CardBody>
-            <VStack spacing={6} align="start" width="full">
-              <Heading size="md">Change Password</Heading>
-
-              {pwdMessage && (
-                <Alert status="success" borderRadius="md">
-                  <AlertIcon />
-                  {pwdMessage}
-                </Alert>
+            <form onSubmit={handleUpdatePassword}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="current-password">Current Password</label>
+                <input
+                  id="current-password"
+                  className="form-input"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  disabled={!canUpdate}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label" htmlFor="new-password">New Password</label>
+                <input
+                  id="new-password"
+                  className="form-input"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={8}
+                  required
+                  disabled={!canUpdate}
+                />
+              </div>
+              {canUpdate && (
+                <button type="submit" className="btn btn-primary btn-block">
+                  Update Password
+                </button>
               )}
-              {pwdError && (
-                <Alert status="error" borderRadius="md">
-                  <AlertIcon />
-                  {pwdError}
-                </Alert>
-              )}
+            </form>
+          </div>
+        </div>
 
-              <form onSubmit={handleUpdatePassword} style={{ width: '100%' }}>
-                <VStack spacing={4}>
-                  <FormControl isRequired>
-                    <FormLabel>Current Password</FormLabel>
-                    <Input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      size="lg"
-                    />
-                  </FormControl>
+        {/* Permissions Display */}
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="card-header">
+            <span className="card-title">Your Permissions</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {permissions.map(p => (
+              <code key={p} style={{
+                background: 'var(--color-primary-soft)',
+                color: 'var(--color-primary)',
+                padding: '4px 10px',
+                borderRadius: 6,
+                fontSize: '0.75rem',
+                fontWeight: 500,
+              }}>
+                {p}
+              </code>
+            ))}
+          </div>
+        </div>
 
-                  <FormControl isRequired>
-                    <FormLabel>New Password</FormLabel>
-                    <Input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      size="lg"
-                    />
-                  </FormControl>
-
-                  <Button type="submit" colorScheme="blue" width="full" size="lg">
-                    Update Password
-                  </Button>
-                </VStack>
-              </form>
-            </VStack>
-          </CardBody>
-        </Card>
-      </SimpleGrid>
-    </Container>
+        {/* Danger Zone */}
+        {canDelete && (
+          <div className="card" style={{ marginTop: 20, borderColor: 'var(--color-danger)', borderWidth: 1 }}>
+            <div className="card-header">
+              <span className="card-title" style={{ color: 'var(--color-danger)' }}>Danger Zone</span>
+            </div>
+            <p className="text-secondary" style={{ marginBottom: 16, fontSize: '0.875rem' }}>
+              Once you delete your account, there is no going back. This will permanently remove your data.
+            </p>
+            <button className="btn btn-danger" onClick={handleDeleteAccount}>
+              Delete My Account
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 
