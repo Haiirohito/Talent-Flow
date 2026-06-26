@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { fetchApi } from '../api/client';
+import { canModifyUser as canModifyUserByRole } from '../utils/roleUtils';
 
 export type UserRole = 'admin' | 'hr_manager' | 'recruiter' | 'employee' | 'viewer';
 
@@ -39,6 +40,8 @@ interface AuthContextType {
   hasPermission: (perm: string) => boolean;
   hasAnyPermission: (...perms: string[]) => boolean;
   refreshUser: () => Promise<void>;
+  /** Check if the current user can modify a user with the given role (mirrors backend). */
+  canModifyUser: (targetRole: UserRole) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -91,6 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const hasPermission = (perm: string) => permissions.includes(perm);
   const hasAnyPermission = (...perms: string[]) => perms.some(p => permissions.includes(p));
 
+  /** Check if the current user can modify a user with the given target role. */
+  const canModifyUser = useCallback(
+    (targetRole: UserRole) => {
+      if (!user) return false;
+      return canModifyUserByRole(user.role, targetRole);
+    },
+    [user],
+  );
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -103,6 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       hasPermission,
       hasAnyPermission,
       refreshUser: fetchUser,
+      canModifyUser,
     }}>
       {children}
     </AuthContext.Provider>

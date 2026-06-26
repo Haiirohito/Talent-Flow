@@ -1,15 +1,19 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.api.deps import SessionDep
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.users import crud
 from app.users.models import (
     User,
     UserPublic,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["private"], prefix="/private")
 
@@ -25,6 +29,20 @@ def create_user(user_in: PrivateUserCreate, session: SessionDep) -> Any:
     """
     Create a new user (private/local-only endpoint).
     """
+    # Runtime environment guard — defense-in-depth in case the router
+    # is accidentally registered in a non-local deployment.
+    if settings.ENVIRONMENT != "local":
+        raise HTTPException(
+            status_code=403,
+            detail="This endpoint is only available in the local environment",
+        )
+
+    logger.warning(
+        "Private user creation endpoint used (email=%s). "
+        "This endpoint has no authentication and should only be used locally.",
+        user_in.email,
+    )
+
     # Check for existing user to prevent UniqueViolation crash
     existing = crud.get_user_by_email(session=session, email=user_in.email)
     if existing:

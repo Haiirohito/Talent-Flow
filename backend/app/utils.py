@@ -13,7 +13,7 @@ def generate_password_reset_token(email: str) -> str:
     expires = now + delta
     exp = expires.timestamp()
     encoded_jwt = jwt.encode(
-        {"exp": exp, "nbf": now, "sub": email},
+        {"exp": exp, "nbf": now, "sub": email, "type": "password_reset"},
         settings.SECRET_KEY,
         algorithm=security.ALGORITHM,
     )
@@ -37,6 +37,9 @@ def generate_invitation_token(email: str, role: str) -> str:
 def verify_password_reset_token(token: str) -> str | None:
     try:
         decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=[security.ALGORITHM])
+        # Validate token type to prevent cross-token abuse
+        if decoded_token.get("type") != "password_reset":
+            return None
         return str(decoded_token["sub"])
     except InvalidTokenError:
         return None

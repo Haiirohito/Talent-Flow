@@ -30,6 +30,57 @@ from app.utils import generate_invitation_token, verify_invitation_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+# ---------------------------------------------------------------------------
+# Role hierarchy — lower index = higher privilege.
+# Used to prevent privilege escalation (e.g. HR creating admin users).
+# ---------------------------------------------------------------------------
+
+ROLE_HIERARCHY: list[UserRole] = [
+    UserRole.ADMIN,
+    UserRole.HR_MANAGER,
+    UserRole.RECRUITER,
+    UserRole.EMPLOYEE,
+    UserRole.VIEWER,
+]
+
+
+def _role_rank(role: UserRole) -> int:
+    """Return the rank index for a role (0 = most privileged)."""
+    try:
+        return ROLE_HIERARCHY.index(role)
+    except ValueError:
+        return len(ROLE_HIERARCHY)
+
+
+def _assert_can_assign_role(
+    caller: User, target_role: UserRole | None, *, verb: str = "assign"
+) -> None:
+    """Raise 403 if *caller* is not allowed to assign *target_role*.
+
+    Rules:
+      • Only admins may assign the admin role.
+      • Non-admins may only assign roles at or below their own rank.
+    """
+    if target_role is None:
+        return
+    if _role_rank(target_role) < _role_rank(caller.role):
+        raise HTTPException(
+            status_code=403,
+            detail=f"You do not have permission to {verb} the '{target_role}' role",
+        )
+
+
+def _assert_can_modify_target(caller: User, target: User) -> None:
+    """Raise 403 if *caller* is not allowed to modify *target*.
+
+    Non-admins cannot modify admin accounts.
+    """
+    if target.role == UserRole.ADMIN and caller.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Only admins can modify admin accounts",
+        )
+
 
 @router.get(
     "/",
@@ -63,10 +114,15 @@ def read_users(
     dependencies=[Depends(require_permissions(Permission.USERS_CREATE))],
     response_model=UserPublic,
 )
-def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
+def create_user(
+    *, session: SessionDep, user_in: UserCreate, current_user: CurrentUser
+) -> Any:
     """
     Create new user (admin/HR only).
     """
+    # Enforce role hierarchy — prevent non-admins from creating admin users
+    _assert_can_assign_role(current_user, user_in.role, verb="create users with")
+
     user = crud.get_user_by_email(session=session, email=user_in.email)
     if user:
         raise HTTPException(
@@ -193,11 +249,16 @@ def register_user(session: SessionDep, user_in: UserRegister, token: str) -> Any
     dependencies=[Depends(require_permissions(Permission.USERS_INVITE))],
     response_model=InvitationResponse,
 )
-def invite_user(session: SessionDep, invitation: InvitationCreate) -> Any:
+def invite_user(
+    session: SessionDep, invitation: InvitationCreate, current_user: CurrentUser
+) -> Any:
     """
     Invite a new user by email (generates an invitation link).
     Admin and HR managers can invite users.
     """
+    # Enforce role hierarchy — prevent non-admins from inviting as admin
+    _assert_can_assign_role(current_user, invitation.role, verb="invite users as")
+
     # Check if user already exists
     existing_user = crud.get_user_by_email(session=session, email=invitation.email)
     if existing_user:
@@ -261,6 +322,7 @@ def update_user(
     session: SessionDep,
     user_id: uuid.UUID,
     user_in: UserUpdate,
+    current_user: CurrentUser,
 ) -> Any:
     """
     Update a user.
@@ -272,6 +334,13 @@ def update_user(
             status_code=404,
             detail="The user with this id does not exist in the system",
         )
+
+    # Enforce role hierarchy — non-admins cannot modify admin accounts
+    _assert_can_modify_target(current_user, db_user)
+
+    # Enforce role hierarchy — prevent assigning a role above caller's own
+    _assert_can_assign_role(current_user, user_in.role, verb="assign")
+
     if user_in.email:
         existing_user = crud.get_user_by_email(session=session, email=user_in.email)
         if existing_user and existing_user.id != user_id:
@@ -298,8 +367,11 @@ def delete_user(
         raise HTTPException(status_code=404, detail="User not found")
     if user == current_user:
         raise HTTPException(
-            status_code=403, detail="Admin users are not allowed to delete themselves"
+            status_code=403, detail="Users are not allowed to delete themselves"
         )
+    # Enforce role hierarchy — non-admins cannot delete admin accounts
+    _assert_can_modify_target(current_user, user)
+
     session.delete(user)
     session.commit()
     return Message(message="User deleted successfully")

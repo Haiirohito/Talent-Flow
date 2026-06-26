@@ -1,15 +1,11 @@
 import React, { useState } from 'react';
 import { fetchApi } from '../api/client';
+import { useAuth } from '../components/AuthContext';
 import type { UserRole } from '../components/AuthContext';
-
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'employee', label: 'Employee' },
-  { value: 'viewer', label: 'Viewer' },
-  { value: 'recruiter', label: 'Recruiter' },
-  { value: 'hr_manager', label: 'HR Manager' },
-];
+import { getAssignableRoles } from '../utils/roleUtils';
 
 const InviteUser: React.FC = () => {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<UserRole>('employee');
   const [sending, setSending] = useState(false);
@@ -77,7 +73,7 @@ const InviteUser: React.FC = () => {
                   value={role}
                   onChange={e => setRole(e.target.value as UserRole)}
                 >
-                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  {getAssignableRoles(user?.role ?? 'employee').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
 

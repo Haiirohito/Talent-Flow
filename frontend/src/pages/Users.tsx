@@ -2,14 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../components/AuthContext';
 import type { User, UserRole } from '../components/AuthContext';
+import { getAssignableRoles, canModifyUser } from '../utils/roleUtils';
 
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'hr_manager', label: 'HR Manager' },
-  { value: 'recruiter', label: 'Recruiter' },
-  { value: 'employee', label: 'Employee' },
-  { value: 'viewer', label: 'Viewer' },
-];
+
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -189,7 +184,7 @@ const Users: React.FC = () => {
                     value={createForm.role}
                     onChange={e => setCreateForm({ ...createForm, role: e.target.value as UserRole })}
                   >
-                    {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {getAssignableRoles(user?.role ?? 'employee').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -236,7 +231,7 @@ const Users: React.FC = () => {
                     value={editForm.role}
                     onChange={e => setEditForm({ ...editForm, role: e.target.value as UserRole })}
                   >
-                    {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    {getAssignableRoles(user?.role ?? 'employee').map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -274,7 +269,13 @@ const Users: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u: any) => (
+                {users.map((u: any) => {
+                  // Determine if current user can modify this user (role hierarchy)
+                  const canModify = canModifyUser(user?.role ?? 'viewer', u.role);
+                  const showEdit = canUpdate && canModify;
+                  const showDelete = canDelete && canModify && u.id !== user?.id;
+
+                  return (
                   <tr key={u.id}>
                     <td>{u.full_name || '—'}</td>
                     <td>{u.email}</td>
@@ -294,7 +295,7 @@ const Users: React.FC = () => {
                     {(canUpdate || canDelete) && (
                       <td>
                         <div className="flex-gap">
-                          {canUpdate && (
+                          {showEdit && (
                             <button
                               className="btn btn-outline btn-sm"
                               onClick={() => startEdit(u)}
@@ -303,11 +304,10 @@ const Users: React.FC = () => {
                               Edit
                             </button>
                           )}
-                          {canDelete && (
+                          {showDelete && (
                             <button
                               className="btn btn-danger btn-sm"
                               onClick={() => handleDelete(u.id)}
-                              disabled={u.id === user?.id}
                             >
                               Delete
                             </button>
@@ -316,7 +316,8 @@ const Users: React.FC = () => {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
                 {users.length === 0 && (
                   <tr>
                     <td colSpan={(canUpdate || canDelete) ? 6 : 5}>

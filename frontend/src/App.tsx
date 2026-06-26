@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './components/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import { PermissionRoute } from './components/ProtectedRoute';
 import DashboardLayout from './components/DashboardLayout';
 
 import Login from './pages/Login';
@@ -25,12 +26,24 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/users" element={<Users />} />
-              <Route path="/invite" element={<InviteUser />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/email-test" element={<EmailTest />} />
+
+              {/* Permission-gated routes */}
+              <Route element={<PermissionRoute permission="users:read" />}>
+                <Route path="/users" element={<Users />} />
+              </Route>
+              <Route element={<PermissionRoute permission="users:invite" />}>
+                <Route path="/invite" element={<InviteUser />} />
+              </Route>
+              <Route element={<PermissionRoute permission="dashboard:admin" />}>
+                <Route path="/admin" element={<AdminPanel />} />
+              </Route>
+              <Route element={<PermissionRoute permission="system:settings" />}>
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              <Route element={<PermissionRoute permission="system:email_test" />}>
+                <Route path="/email-test" element={<EmailTest />} />
+              </Route>
             </Route>
           </Route>
 
