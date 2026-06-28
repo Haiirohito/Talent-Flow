@@ -8,10 +8,8 @@ from app.api.deps import SessionDep
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.users import crud
-from app.users.models import (
-    User,
-    UserPublic,
-)
+from app.users.models import User
+from app.users.schemas import UserPublic
 
 logger = logging.getLogger(__name__)
 

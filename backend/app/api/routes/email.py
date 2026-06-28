@@ -3,7 +3,7 @@ from pydantic.networks import EmailStr
 
 from app.core.permissions import Permission, require_permissions
 from app.email.services import generate_test_email, send_email
-from app.users.models import Message
+from app.users.schemas import Message
 
 router = APIRouter(prefix="/email", tags=["email"])
 

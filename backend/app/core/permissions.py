@@ -55,6 +55,12 @@ class Permission(StrEnum):
     DASHBOARD_RECRUITMENT = "dashboard:recruitment"
     DASHBOARD_EMPLOYEE = "dashboard:employee"
 
+    # Tickets
+    TICKETS_CREATE = "tickets:create"
+    TICKETS_READ = "tickets:read"
+    TICKETS_UPDATE = "tickets:update"
+    TICKETS_DELETE = "tickets:delete"
+
     # System / utilities
     SYSTEM_SETTINGS = "system:settings"
     SYSTEM_EMAIL_TEST = "system:email_test"
@@ -75,6 +81,10 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.PROFILE_UPDATE,
         Permission.DASHBOARD_HR,
         Permission.DASHBOARD_EMPLOYEE,
+        Permission.TICKETS_CREATE,
+        Permission.TICKETS_READ,
+        Permission.TICKETS_UPDATE,
+        Permission.TICKETS_DELETE,
     },
     UserRole.RECRUITER: {
         Permission.USERS_READ,
@@ -82,16 +92,21 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.PROFILE_UPDATE,
         Permission.DASHBOARD_RECRUITMENT,
         Permission.DASHBOARD_EMPLOYEE,
+        Permission.TICKETS_CREATE,
+        Permission.TICKETS_READ,
+        Permission.TICKETS_UPDATE,
     },
     UserRole.EMPLOYEE: {
         Permission.PROFILE_READ,
         Permission.PROFILE_UPDATE,
         Permission.PROFILE_DELETE,
         Permission.DASHBOARD_EMPLOYEE,
+        Permission.TICKETS_READ,
     },
     UserRole.VIEWER: {
         Permission.PROFILE_READ,
         Permission.DASHBOARD_EMPLOYEE,
+        Permission.TICKETS_READ,
     },
 }
 

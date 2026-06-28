@@ -10,6 +10,7 @@ from app.core.config import settings
 
 # Import all models so that SQLModel has them registered in its metadata
 from app.users.models import User  # noqa: F401
+from app.ticket.models import RequirementTicket  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

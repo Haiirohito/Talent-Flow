@@ -15,7 +15,8 @@ from app.core import security
 from app.core.config import settings
 from app.core.db import engine
 from app.core.permissions import UserRole
-from app.users.models import TokenPayload, User
+from app.users.models import User
+from app.users.schemas import TokenPayload
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"

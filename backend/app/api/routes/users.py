@@ -13,12 +13,12 @@ from app.email.services import (
     send_email,
 )
 from app.users import crud
-from app.users.models import (
+from app.users.models import User
+from app.users.schemas import (
     InvitationCreate,
     InvitationResponse,
     Message,
     UpdatePassword,
-    User,
     UserCreate,
     UserPublic,
     UserRegister,
