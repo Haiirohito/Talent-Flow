@@ -61,6 +61,12 @@ class Permission(StrEnum):
     TICKETS_UPDATE = "tickets:update"
     TICKETS_DELETE = "tickets:delete"
 
+    # Client management
+    CLIENTS_READ = "clients:read"
+    CLIENTS_CREATE = "clients:create"
+    CLIENTS_UPDATE = "clients:update"
+    CLIENTS_DELETE = "clients:delete"
+
     # System / utilities
     SYSTEM_SETTINGS = "system:settings"
     SYSTEM_EMAIL_TEST = "system:email_test"
@@ -85,6 +91,10 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.TICKETS_READ,
         Permission.TICKETS_UPDATE,
         Permission.TICKETS_DELETE,
+        Permission.CLIENTS_READ,
+        Permission.CLIENTS_CREATE,
+        Permission.CLIENTS_UPDATE,
+        Permission.CLIENTS_DELETE,
     },
     UserRole.RECRUITER: {
         Permission.USERS_READ,
@@ -95,6 +105,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.TICKETS_CREATE,
         Permission.TICKETS_READ,
         Permission.TICKETS_UPDATE,
+        Permission.CLIENTS_READ,
     },
     UserRole.EMPLOYEE: {
         Permission.PROFILE_READ,

@@ -3,6 +3,7 @@ import { fetchApi } from '../api/client';
 import { useAuth } from '../components/AuthContext';
 import type { User, UserRole } from '../components/AuthContext';
 import { getAssignableRoles, canModifyUser } from '../utils/roleUtils';
+import SlideOver from '../components/SlideOver';
 
 
 
@@ -15,6 +16,7 @@ const Users: React.FC = () => {
 
   // Create user form state
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [createForm, setCreateForm] = useState({ email: '', password: '', full_name: '', role: 'employee' as UserRole });
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -276,7 +278,7 @@ const Users: React.FC = () => {
                   const showDelete = canDelete && canModify && u.id !== user?.id;
 
                   return (
-                  <tr key={u.id}>
+                  <tr key={u.id} className="row-clickable" onClick={() => setSelectedUser(u)}>
                     <td>{u.full_name || '—'}</td>
                     <td>{u.email}</td>
                     <td>
@@ -293,12 +295,12 @@ const Users: React.FC = () => {
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'}
                     </td>
                     {(canUpdate || canDelete) && (
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <div className="flex-gap">
                           {showEdit && (
                             <button
                               className="btn btn-outline btn-sm"
-                              onClick={() => startEdit(u)}
+                              onClick={(e) => { e.stopPropagation(); startEdit(u); }}
                               disabled={editingId === u.id}
                             >
                               Edit
@@ -307,7 +309,7 @@ const Users: React.FC = () => {
                           {showDelete && (
                             <button
                               className="btn btn-danger btn-sm"
-                              onClick={() => handleDelete(u.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(u.id); }}
                             >
                               Delete
                             </button>
@@ -330,6 +332,48 @@ const Users: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <SlideOver
+        isOpen={!!selectedUser}
+        onClose={() => setSelectedUser(null)}
+        title={selectedUser ? selectedUser.full_name || selectedUser.email : ''}
+      >
+        {selectedUser && (
+          <div>
+            <div className="grid-2">
+              <div className="glance-section">
+                <span className="glance-label">Email</span>
+                <div className="glance-value">
+                  <a href={`mailto:${selectedUser.email}`} style={{ color: 'var(--color-primary)' }}>
+                    {selectedUser.email}
+                  </a>
+                </div>
+              </div>
+              <div className="glance-section">
+                <span className="glance-label">Role</span>
+                <span className={`badge ${selectedUser.role === 'admin' ? 'badge-admin' : 'badge-user'}`}>
+                  {selectedUser.role?.replace('_', ' ') || 'employee'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div className="glance-section">
+                <span className="glance-label">Status</span>
+                <span className={`badge ${selectedUser.is_active ? 'badge-active' : 'badge-inactive'}`}>
+                  {selectedUser.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="glance-section">
+                <span className="glance-label">Created At</span>
+                <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
+                  {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleString() : '—'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </SlideOver>
     </>
   );
 };

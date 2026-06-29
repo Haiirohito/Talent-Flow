@@ -15,3 +15,19 @@ class TicketValidationError(HTTPException):
 
     def __init__(self, detail: str = "Invalid ticket operation") -> None:
         super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
+
+
+class InvalidTransitionError(HTTPException):
+    """Raised when a stage or status transition is not allowed."""
+
+    def __init__(
+        self,
+        *,
+        current: str,
+        target: str,
+        kind: str = "stage",
+    ) -> None:
+        detail = (
+            f"Invalid {kind} transition: '{current}' → '{target}' is not allowed"
+        )
+        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)

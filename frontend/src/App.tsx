@@ -9,6 +9,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
+import Clients from './pages/Clients';
+import Tickets from './pages/Tickets';
 import InviteUser from './pages/InviteUser';
 import AdminPanel from './pages/AdminPanel';
 import Settings from './pages/Settings';
@@ -31,6 +33,12 @@ const App: React.FC = () => {
               {/* Permission-gated routes */}
               <Route element={<PermissionRoute permission="users:read" />}>
                 <Route path="/users" element={<Users />} />
+              </Route>
+              <Route element={<PermissionRoute permission="clients:read" />}>
+                <Route path="/clients" element={<Clients />} />
+              </Route>
+              <Route element={<PermissionRoute permission="tickets:read" />}>
+                <Route path="/tickets" element={<Tickets />} />
               </Route>
               <Route element={<PermissionRoute permission="users:invite" />}>
                 <Route path="/invite" element={<InviteUser />} />

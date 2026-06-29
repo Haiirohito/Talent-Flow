@@ -23,7 +23,7 @@ def get_ticket(*, session: Session, ticket_id) -> RequirementTicket | None:
     """Retrieve a single ticket by its UUID (excludes soft-deleted)."""
     statement = select(RequirementTicket).where(
         RequirementTicket.id == ticket_id,
-        RequirementTicket.is_deleted == False,  # noqa: E712
+        RequirementTicket.deleted_at.is_(None),  # type: ignore[union-attr]
     )
     return session.exec(statement).first()
 
@@ -32,7 +32,7 @@ def get_ticket_by_number(*, session: Session, ticket_number: str) -> Requirement
     """Retrieve a ticket by its human-readable number (excludes soft-deleted)."""
     statement = select(RequirementTicket).where(
         RequirementTicket.ticket_number == ticket_number,
-        RequirementTicket.is_deleted == False,  # noqa: E712
+        RequirementTicket.deleted_at.is_(None),  # type: ignore[union-attr]
     )
     return session.exec(statement).first()
 
@@ -41,7 +41,7 @@ def list_tickets(*, session: Session, skip: int = 0, limit: int = 100) -> list[R
     """Return a paginated list of tickets ordered by created_at desc (excludes soft-deleted)."""
     statement = (
         select(RequirementTicket)
-        .where(RequirementTicket.is_deleted == False)  # noqa: E712
+        .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
         .order_by(col(RequirementTicket.created_at).desc())
         .offset(skip)
         .limit(limit)
@@ -54,7 +54,7 @@ def count_tickets(*, session: Session) -> int:
     statement = (
         select(func.count())
         .select_from(RequirementTicket)
-        .where(RequirementTicket.is_deleted == False)  # noqa: E712
+        .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
     )
     return session.exec(statement).one()
 
@@ -62,7 +62,7 @@ def count_tickets(*, session: Session) -> int:
 def update_ticket(
     *, session: Session, db_ticket: RequirementTicket, ticket_in: TicketUpdate
 ) -> RequirementTicket:
-    """Apply a partial update to an existing ticket."""
+    """Apply a partial update to an existing ticket (data fields only)."""
     update_data = ticket_in.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now(timezone.utc)
     db_ticket.sqlmodel_update(update_data)
@@ -72,9 +72,32 @@ def update_ticket(
     return db_ticket
 
 
-def soft_delete_ticket(*, session: Session, db_ticket: RequirementTicket) -> RequirementTicket:
-    """Mark a ticket as deleted (soft delete)."""
-    db_ticket.is_deleted = True
+def save_ticket(*, session: Session, ticket: RequirementTicket) -> RequirementTicket:
+    """Persist any in-memory changes to a ticket (used after workflow transitions)."""
+    ticket.updated_at = datetime.now(timezone.utc)
+    session.add(ticket)
+    session.commit()
+    session.refresh(ticket)
+    return ticket
+
+
+def soft_delete_ticket(
+    *, session: Session, db_ticket: RequirementTicket, deleted_by_id
+) -> RequirementTicket:
+    """Mark a ticket as deleted (soft delete) with audit trail."""
+    db_ticket.deleted_at = datetime.now(timezone.utc)
+    db_ticket.deleted_by = deleted_by_id
+    db_ticket.updated_at = datetime.now(timezone.utc)
+    session.add(db_ticket)
+    session.commit()
+    session.refresh(db_ticket)
+    return db_ticket
+
+
+def restore_ticket(*, session: Session, db_ticket: RequirementTicket) -> RequirementTicket:
+    """Restore a soft-deleted ticket."""
+    db_ticket.deleted_at = None
+    db_ticket.deleted_by = None
     db_ticket.updated_at = datetime.now(timezone.utc)
     session.add(db_ticket)
     session.commit()

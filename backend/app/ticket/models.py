@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import StrEnum
 
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, String
 from sqlmodel import Field, SQLModel
 
 # ---------------------------------------------------------------------------
@@ -26,6 +26,7 @@ class TicketStage(StrEnum):
     INTERVIEW_SCHEDULED = "interview_scheduled"
     CANDIDATE_CONFIRMATION_PENDING = "candidate_confirmation_pending"
     INTERVIEW_COMPLETED = "interview_completed"
+    INTERVIEW_FEEDBACK_PENDING = "interview_feedback_pending"
     SELECTED = "selected"
     JOINING_PENDING = "joining_pending"
     JOINED = "joined"
@@ -71,6 +72,8 @@ class RequirementTicket(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
+    client_id: uuid.UUID = Field(foreign_key="clients.id")
+
     ticket_number: str = Field(index=True, unique=True)
 
     title: str = Field(max_length=255)
@@ -78,11 +81,17 @@ class RequirementTicket(SQLModel, table=True):
 
     vacancies: int = Field(default=1, ge=1)
 
-    priority: str = Field(default=TicketPriority.DEFAULT)
-    stage: str = Field(default=TicketStage.REQUIREMENT_CREATED)
-    status: str = Field(default=TicketStatus.ACTIVE)
+    priority: TicketPriority = Field(sa_type=String)
+    current_stage: TicketStage = Field(sa_type=String)
+    status: TicketStatus = Field(sa_type=String)
 
-    is_deleted: bool = Field(default=False, index=True)
+    # Soft-delete fields
+    deleted_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+        index=True,
+    )
+    deleted_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
 
     created_by: uuid.UUID = Field(foreign_key="users.id")
 

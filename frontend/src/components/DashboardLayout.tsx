@@ -32,6 +32,19 @@ const icons = {
       <circle cx="12" cy="7" r="4"/>
     </svg>
   ),
+  briefcase: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+    </svg>
+  ),
+  ticket: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 5.5A3.5 3.5 0 0 0 11.5 9h-3A3.5 3.5 0 0 0 5 12.5V16h14v-3.5a3.5 3.5 0 0 0-3.5-3.5h-3A3.5 3.5 0 0 0 9 5.5V2H15z" />
+      <path d="M15 2v3.5a3.5 3.5 0 0 1-3.5 3.5h-3A3.5 3.5 0 0 1 5 5.5V2"/>
+      <rect x="2" y="2" width="20" height="20" rx="2" ry="2"/>
+    </svg>
+  ),
   shield: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -77,6 +90,8 @@ const DashboardLayout: React.FC = () => {
   const canViewUsers = hasPermission('users:read');
   const canInviteUsers = hasPermission('users:invite');
   const canViewAdmin = hasPermission('dashboard:admin');
+  const canViewClients = hasPermission('clients:read');
+  const canViewTickets = hasPermission('tickets:read');
   const canTestEmail = hasPermission('system:email_test');
   const canViewSettings = hasPermission('system:settings');
 
@@ -103,17 +118,38 @@ const DashboardLayout: React.FC = () => {
           </NavLink>
 
           {/* User Management — only if user has users:read */}
+          {(canViewUsers || canViewClients || canViewTickets) && (
+            <span className="sidebar-section-label">Management</span>
+          )}
+
           {canViewUsers && (
-            <>
-              <span className="sidebar-section-label">Management</span>
-              <NavLink
-                to="/users"
-                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-              >
-                {icons.users}
-                Users
-              </NavLink>
-            </>
+            <NavLink
+              to="/users"
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+            >
+              {icons.users}
+              Users
+            </NavLink>
+          )}
+
+          {canViewClients && (
+            <NavLink
+              to="/clients"
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+            >
+              {icons.briefcase}
+              Clients
+            </NavLink>
+          )}
+
+          {canViewTickets && (
+            <NavLink
+              to="/tickets"
+              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+            >
+              {icons.ticket}
+              Tickets
+            </NavLink>
           )}
 
           {canInviteUsers && (

@@ -8,8 +8,8 @@ from sqlmodel import Session
 
 from app.api.deps import get_db
 from app.ticket import repository
-from app.ticket.exceptions import TicketNotFoundError
 from app.ticket.models import RequirementTicket
+from app.ticket.workflow.exceptions import TicketNotFoundError
 
 
 def get_ticket_or_404(
