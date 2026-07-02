@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session, col, func, select
 
-from app.ticket.models import RequirementTicket
+from app.ticket.models import RequirementTicket, TicketReopenRequest
 from app.ticket.schemas import TicketUpdate
 
 
@@ -109,3 +109,42 @@ def hard_delete_ticket(*, session: Session, db_ticket: RequirementTicket) -> Non
     """Permanently remove a ticket from the database."""
     session.delete(db_ticket)
     session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Reopen Request
+# ---------------------------------------------------------------------------
+
+
+def create_reopen_request(*, session: Session, request: TicketReopenRequest) -> TicketReopenRequest:
+    session.add(request)
+    session.commit()
+    session.refresh(request)
+    return request
+
+
+def get_reopen_request(*, session: Session, request_id) -> TicketReopenRequest | None:
+    return session.get(TicketReopenRequest, request_id)
+
+
+def list_reopen_requests(*, session: Session, skip: int = 0, limit: int = 100) -> list[TicketReopenRequest]:
+    statement = (
+        select(TicketReopenRequest)
+        .order_by(col(TicketReopenRequest.created_at).desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return list(session.exec(statement).all())
+
+
+def count_reopen_requests(*, session: Session) -> int:
+    statement = select(func.count()).select_from(TicketReopenRequest)
+    return session.exec(statement).one()
+
+
+def save_reopen_request(*, session: Session, request: TicketReopenRequest) -> TicketReopenRequest:
+    request.updated_at = datetime.now(timezone.utc)
+    session.add(request)
+    session.commit()
+    session.refresh(request)
+    return request

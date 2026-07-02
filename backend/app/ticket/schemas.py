@@ -93,3 +93,34 @@ class TicketsPublic(SQLModel):
 
     data: list[TicketRead]
     count: int
+
+
+# ---------------------------------------------------------------------------
+# Reopen Requests
+# ---------------------------------------------------------------------------
+
+
+class TicketReopenCreate(SQLModel):
+    reason: str
+
+
+class TicketReopenReview(SQLModel):
+    notes: str | None = None
+
+
+class TicketReopenRequestRead(SQLModel):
+    id: uuid.UUID
+    ticket_id: uuid.UUID
+    requested_by: uuid.UUID
+    reason: str
+    status: str
+    reviewed_by: uuid.UUID | None = None
+    review_notes: str | None = None
+    reviewed_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class TicketReopenRequestsPublic(SQLModel):
+    data: list[TicketReopenRequestRead]
+    count: int

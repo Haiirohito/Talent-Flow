@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../components/AuthContext';
 import SlideOver from '../components/SlideOver';
+import { useToast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
+import PriorityIndicator from '../components/PriorityIndicator';
+import StatusBadge from '../components/StatusBadge';
+import EmptyState from '../components/EmptyState';
+import StagePipeline, { STAGE_ORDER } from '../components/StagePipeline';
+import { Ticket as TicketIcon, Plus } from '../components/icons';
 
 interface Client {
   id: string;
@@ -23,13 +30,23 @@ interface Ticket {
   valid_next_stages?: string[];
 }
 
+const getErrorMessage = (err: unknown, fallback: string) => {
+  if (err instanceof Error && err.message) return err.message;
+
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const message = (err as { message?: unknown }).message;
+    if (typeof message === 'string' && message) return message;
+  }
+
+  return fallback;
+};
+
 const Tickets: React.FC = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const { hasPermission } = useAuth();
+  const toast = useToast();
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -41,7 +58,13 @@ const Tickets: React.FC = () => {
     client_id: '',
   });
   const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
+  
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    action: 'close' | 'delete' | 'reopen' | null;
+    ticketId: string | null;
+  }>({ isOpen: false, action: null, ticketId: null });
+  const [reopenReason, setReopenReason] = useState('');
 
   const canCreate = hasPermission('tickets:create');
   const canUpdate = hasPermission('tickets:update');
@@ -55,7 +78,6 @@ const Tickets: React.FC = () => {
         fetchApi('/clients/'),
       ]);
       
-      // For each ticket, fetch its details to get valid transitions (since list API doesn't return them)
       const ticketsList = ticketsData.data || ticketsData;
       const enrichedTickets = await Promise.all(
         ticketsList.map((t: Ticket) => fetchApi(`/tickets/${t.id}`).catch(() => t))
@@ -63,20 +85,24 @@ const Tickets: React.FC = () => {
       
       setTickets(enrichedTickets);
       setClients(clientsData.data || clientsData);
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch tickets');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to fetch tickets'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
+    const timeoutId = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateError('');
     setCreating(true);
     try {
       await fetchApi('/tickets/', {
@@ -85,10 +111,10 @@ const Tickets: React.FC = () => {
       });
       setShowCreate(false);
       setCreateForm({ title: '', description: '', vacancies: 1, priority: 'default', client_id: '' });
-      setSuccess('Ticket created successfully');
-      loadData();
-    } catch (err: any) {
-      setCreateError(err.message || 'Failed to create ticket');
+      toast.success('Ticket created successfully');
+      void loadData();
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to create ticket'));
     } finally {
       setCreating(false);
     }
@@ -100,10 +126,16 @@ const Tickets: React.FC = () => {
         method: 'POST',
         body: JSON.stringify({ target_stage: targetStage }),
       });
-      setSuccess('Ticket stage updated');
-      loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update ticket stage');
+      toast.success('Ticket stage updated');
+      void loadData();
+      
+      // Update selected ticket if it's open
+      if (selectedTicket?.id === ticketId) {
+        const updated = await fetchApi(`/tickets/${ticketId}`);
+        setSelectedTicket(updated);
+      }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to update ticket stage'));
     }
   };
 
@@ -113,56 +145,73 @@ const Tickets: React.FC = () => {
         method: 'PATCH',
         body: JSON.stringify({ priority: newPriority }),
       });
-      setSuccess('Ticket priority updated');
-      loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update priority');
+      toast.success('Ticket priority updated');
+      void loadData();
+      
+      // Update selected ticket if it's open
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket({ ...selectedTicket, priority: newPriority });
+      }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to update priority'));
     }
   };
 
-  const handleClose = async (ticketId: string) => {
-    if (!window.confirm('Are you sure you want to close this ticket?')) return;
+  const executeConfirmAction = async () => {
+    const { action, ticketId } = confirmState;
+    if (!action || !ticketId) return;
+
     try {
-      await fetchApi(`/tickets/${ticketId}/close`, { method: 'POST' });
-      setSuccess('Ticket closed');
-      loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to close ticket');
+      if (action === 'close') {
+        await fetchApi(`/tickets/${ticketId}/close`, { method: 'POST' });
+        toast.success('Ticket closed');
+      } else if (action === 'delete') {
+        await fetchApi(`/tickets/${ticketId}`, { method: 'DELETE' });
+        toast.success('Ticket deleted');
+      } else if (action === 'reopen') {
+        await fetchApi(`/tickets/${ticketId}/reopen-request`, {
+          method: 'POST',
+          body: JSON.stringify({ reason: reopenReason })
+        });
+        toast.success('Reopen request submitted');
+      }
+      void loadData();
+      if (selectedTicket?.id === ticketId) {
+        if (action === 'delete') {
+          setSelectedTicket(null);
+        } else {
+          const updated = await fetchApi(`/tickets/${ticketId}`);
+          setSelectedTicket(updated);
+        }
+      }
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, `Failed to ${action} ticket`));
+    } finally {
+      setConfirmState({ isOpen: false, action: null, ticketId: null });
+      setReopenReason('');
     }
   };
-
-  const handleDelete = async (ticketId: string) => {
-    if (!window.confirm('Are you sure you want to delete this ticket?')) return;
-    try {
-      await fetchApi(`/tickets/${ticketId}`, { method: 'DELETE' });
-      setSuccess('Ticket deleted');
-      loadData();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete ticket');
-    }
-  };
-
-  useEffect(() => {
-    if (success || error) {
-      const t = setTimeout(() => { setSuccess(''); setError(''); }, 4000);
-      return () => clearTimeout(t);
-    }
-  }, [success, error]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
     return client ? (client.company_name || client.name) : 'Unknown Client';
   };
 
-  const formatStage = (stage: string) => {
-    return stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const getStageName = (stageKey: string) => {
+    return STAGE_ORDER.find(s => s.key === stageKey)?.label
+      || stageKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
   if (loading) {
     return (
       <>
         <header className="top-header"><span className="top-header-title">Tickets</span></header>
-        <div className="page-content"><div className="spinner">Loading…</div></div>
+        <div className="page-content">
+          <div className="empty-state">
+            <div className="spinner-icon" style={{ fontSize: '2rem', color: 'var(--color-primary)', marginBottom: '16px' }}>⟳</div>
+            <div>Loading tickets...</div>
+          </div>
+        </div>
       </>
     );
   }
@@ -170,27 +219,28 @@ const Tickets: React.FC = () => {
   return (
     <>
       <header className="top-header">
-        <span className="top-header-title">Requirement Tickets</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="sidebar-brand-icon">
+            <TicketIcon />
+          </div>
+          <span className="top-header-title">Requirement Tickets</span>
+        </div>
         <div className="top-header-actions">
           <span className="text-secondary">{tickets.length} ticket{tickets.length !== 1 ? 's' : ''}</span>
           {canCreate && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'Cancel' : '+ New Ticket'}
+              {showCreate ? 'Cancel' : <><Plus /> New Ticket</>}
             </button>
           )}
         </div>
       </header>
 
       <div className="page-content">
-        {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
-
         {showCreate && (
-          <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card animate-fadeInDown" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <span className="card-title">Create New Ticket</span>
             </div>
-            {createError && <div className="alert alert-error">{createError}</div>}
             <form onSubmit={handleCreate}>
               <div className="form-row">
                 <div className="form-group">
@@ -256,102 +306,73 @@ const Tickets: React.FC = () => {
                   style={{ resize: 'vertical' }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={creating}>
-                {creating ? 'Creating…' : 'Create Ticket'}
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? 'Creating…' : 'Create Ticket'}
+                </button>
+              </div>
             </form>
           </div>
         )}
 
         <div className="table-card">
-          <div className="table-card-header">
-            <span className="table-card-title">All Tickets</span>
-          </div>
           <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Ticket No.</th>
+                  <th>Ticket</th>
                   <th>Client</th>
-                  <th>Title</th>
                   <th>Priority</th>
-                  <th>Stage</th>
+                  <th>Stage Progress</th>
                   <th>Status</th>
-                  {(canUpdate || canDelete) && <th>Actions</th>}
+                  {(canUpdate || canDelete) && <th style={{ textAlign: 'right' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {tickets.map(t => (
-                  <tr key={t.id} className="row-clickable" onClick={() => setSelectedTicket(t)}>
-                    <td><span className="text-muted">{t.ticket_number}</span></td>
-                    <td style={{ fontWeight: 500 }}>{getClientName(t.client_id)}</td>
-                    <td>{t.title} <span className="text-muted">({t.vacancies})</span></td>
+                  <tr key={t.id} className="row-clickable animate-fadeInUp" onClick={() => setSelectedTicket(t)}>
                     <td>
-                      {canUpdate && t.status !== 'closed' && t.status !== 'cancelled' ? (
-                        <select
-                          className={`badge badge-priority-${t.priority}`}
-                          style={{
-                            appearance: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            outline: 'none',
-                            paddingRight: '20px',
-                            backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%23000\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'%3E%3C/path%3E%3C/svg%3E")',
-                            backgroundRepeat: 'no-repeat',
-                            backgroundPosition: 'right 6px center',
-                            backgroundSize: '10px'
-                          }}
-                          value={t.priority}
-                          onClick={e => e.stopPropagation()}
-                          onChange={(e) => { e.stopPropagation(); handlePriorityChange(t.id, e.target.value); }}
-                        >
-                          <option value="low">LOW</option>
-                          <option value="default">DEFAULT</option>
-                          <option value="medium">MEDIUM</option>
-                          <option value="high">HIGH</option>
-                        </select>
-                      ) : (
-                        <span className={`badge badge-priority-${t.priority}`}>
-                          {t.priority.toUpperCase()}
-                        </span>
-                      )}
+                      <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>{t.title}</div>
+                      <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                        {t.ticket_number} • {t.vacancies} Vacanc{t.vacancies !== 1 ? 'ies' : 'y'}
+                      </div>
+                    </td>
+                    <td>{getClientName(t.client_id)}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <PriorityIndicator 
+                        priority={t.priority} 
+                        readonly={!canUpdate || t.status === 'closed' || t.status === 'cancelled'}
+                        onChange={(val) => handlePriorityChange(t.id, val)}
+                      />
                     </td>
                     <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span className={`badge ${t.current_stage === 'closed' || t.current_stage === 'joined' ? 'badge-stage-success' : 'badge-stage'}`}>
-                          {formatStage(t.current_stage)}
-                        </span>
-                        {canUpdate && t.status !== 'closed' && t.status !== 'cancelled' && t.valid_next_stages && t.valid_next_stages.length > 0 && (
-                          <select 
-                            className="form-input"
-                            style={{ fontSize: '0.75rem', padding: '4px 24px 4px 8px', borderRadius: 6, backgroundSize: '12px' }}
-                            value=""
-                            onClick={e => e.stopPropagation()}
-                            onChange={(e) => { e.stopPropagation(); handleStageTransition(t.id, e.target.value); }}
-                          >
-                            <option value="" disabled>Transition…</option>
-                            {t.valid_next_stages.map(stage => (
-                              <option key={stage} value={stage}>{formatStage(stage)}</option>
-                            ))}
-                          </select>
-                        )}
+                      <StagePipeline currentStage={t.current_stage} compact />
+                      <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                        {getStageName(t.current_stage)}
                       </div>
                     </td>
                     <td>
-                      <span className={`badge ${t.status === 'active' ? 'badge-active' : t.status === 'closed' ? 'badge-inactive' : 'badge-user'}`}>
-                        {t.status.replace('_', ' ').toUpperCase()}
-                      </span>
+                      <StatusBadge type="ticket-status" value={t.status} />
                     </td>
                     {(canUpdate || canDelete) && (
                       <td onClick={e => e.stopPropagation()}>
-                        <div className="flex-gap">
+                        <div className="flex-gap" style={{ justifyContent: 'flex-end' }}>
                           {canUpdate && t.status !== 'closed' && (
-                            <button className="btn btn-outline btn-sm" onClick={() => handleClose(t.id)}>
+                            <button 
+                              className="btn btn-outline btn-sm" 
+                              onClick={() => setConfirmState({ isOpen: true, action: 'close', ticketId: t.id })}
+                            >
                               Close
                             </button>
                           )}
                           {canDelete && (
-                            <button className="btn btn-danger btn-sm" onClick={() => handleDelete(t.id)}>
+                            <button 
+                              className="btn btn-danger btn-sm" 
+                              onClick={() => setConfirmState({ isOpen: true, action: 'delete', ticketId: t.id })}
+                            >
                               Delete
                             </button>
                           )}
@@ -362,8 +383,16 @@ const Tickets: React.FC = () => {
                 ))}
                 {tickets.length === 0 && (
                   <tr>
-                    <td colSpan={(canUpdate || canDelete) ? 7 : 6}>
-                      <div className="empty-state">No tickets found.</div>
+                    <td colSpan={(canUpdate || canDelete) ? 6 : 5}>
+                      <EmptyState 
+                        title="No tickets found" 
+                        description="There are currently no active requirement tickets."
+                        action={canCreate ? (
+                          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                            Create Ticket
+                          </button>
+                        ) : undefined}
+                      />
                     </td>
                   </tr>
                 )}
@@ -376,65 +405,123 @@ const Tickets: React.FC = () => {
       <SlideOver
         isOpen={!!selectedTicket}
         onClose={() => setSelectedTicket(null)}
-        title={selectedTicket ? `${selectedTicket.ticket_number} - ${selectedTicket.title}` : ''}
+        title={selectedTicket ? selectedTicket.ticket_number : ''}
+        variant="wide"
+        mode="non-modal"
       >
         {selectedTicket && (
-          <div>
-            <div className="glance-section">
-              <span className="glance-label">Client</span>
-              <div className="glance-value" style={{ fontWeight: 500 }}>
-                {getClientName(selectedTicket.client_id)}
+          <div className="ticket-details-slideover">
+            <div className="ticket-detail-header">
+              <div>
+                <span className="ticket-detail-kicker">{selectedTicket.ticket_number}</span>
+                <h2 className="ticket-detail-title">{selectedTicket.title}</h2>
               </div>
-            </div>
-            
-            <div className="grid-2">
-              <div className="glance-section">
-                <span className="glance-label">Stage</span>
-                <span className={`badge ${selectedTicket.current_stage === 'closed' || selectedTicket.current_stage === 'joined' ? 'badge-stage-success' : 'badge-stage'}`}>
-                  {formatStage(selectedTicket.current_stage)}
-                </span>
-              </div>
-              <div className="glance-section">
-                <span className="glance-label">Status</span>
-                <span className={`badge ${selectedTicket.status === 'active' ? 'badge-active' : selectedTicket.status === 'closed' ? 'badge-inactive' : 'badge-user'}`}>
-                  {selectedTicket.status.replace('_', ' ').toUpperCase()}
-                </span>
+              <div className="ticket-detail-meta">
+                <span className="text-secondary">{getClientName(selectedTicket.client_id)}</span>
+                <StatusBadge type="ticket-status" value={selectedTicket.status} />
+                <span className="text-muted">•</span>
+                <PriorityIndicator 
+                  priority={selectedTicket.priority} 
+                  readonly={!canUpdate || selectedTicket.status === 'closed' || selectedTicket.status === 'cancelled'}
+                  onChange={(val) => handlePriorityChange(selectedTicket.id, val)}
+                />
               </div>
             </div>
 
-            <div className="grid-2">
-              <div className="glance-section">
-                <span className="glance-label">Priority</span>
-                <span className={`badge badge-priority-${selectedTicket.priority}`}>
-                  {selectedTicket.priority.toUpperCase()}
-                </span>
+            <section className="ticket-detail-section ticket-detail-pipeline">
+              <div className="ticket-detail-section-header">
+                <span className="glance-label">Pipeline Stage</span>
+                <span className="ticket-stage-summary">{getStageName(selectedTicket.current_stage)}</span>
               </div>
-              <div className="glance-section">
+              <StagePipeline 
+                currentStage={selectedTicket.current_stage}
+                validNextStages={canUpdate && selectedTicket.status !== 'closed' ? selectedTicket.valid_next_stages : []}
+                onTransition={(stage) => handleStageTransition(selectedTicket.id, stage)}
+                variant="detail"
+              />
+            </section>
+            
+            <div className="ticket-detail-facts">
+              <section className="ticket-detail-fact">
                 <span className="glance-label">Vacancies</span>
                 <div className="glance-value">{selectedTicket.vacancies}</div>
-              </div>
-            </div>
-
-            <div className="glance-section">
-              <span className="glance-label">Description</span>
-              {selectedTicket.description ? (
-                <div className="glance-description">{selectedTicket.description}</div>
-              ) : (
-                <div className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.875rem' }}>No description provided.</div>
+              </section>
+              
+              {selectedTicket.created_at && (
+                <section className="ticket-detail-fact">
+                  <span className="glance-label">Created At</span>
+                  <div className="glance-value text-secondary">
+                    {new Date(selectedTicket.created_at).toLocaleString()}
+                  </div>
+                </section>
               )}
             </div>
 
-            {selectedTicket.created_at && (
-              <div className="glance-section">
-                <span className="glance-label">Created</span>
-                <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
-                  {new Date(selectedTicket.created_at).toLocaleString()}
-                </div>
+            <section className="ticket-detail-section">
+              <span className="glance-label">Job Description</span>
+              {selectedTicket.description ? (
+                <div className="glance-description" style={{ whiteSpace: 'pre-wrap' }}>{selectedTicket.description}</div>
+              ) : (
+                <div className="text-muted" style={{ fontStyle: 'italic' }}>No description provided.</div>
+              )}
+            </section>
+
+            {(canUpdate || canDelete) && (
+              <div className="ticket-detail-actions-footer">
+                 {canUpdate && selectedTicket.status !== 'closed' && selectedTicket.status !== 'cancelled' && (
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => setConfirmState({ isOpen: true, action: 'close', ticketId: selectedTicket.id })}
+                    >
+                      Close Ticket
+                    </button>
+                  )}
+                  {canUpdate && (selectedTicket.status === 'closed' || selectedTicket.status === 'cancelled') && (
+                    <button 
+                      className="btn btn-outline"
+                      onClick={() => {
+                        setReopenReason('');
+                        setConfirmState({ isOpen: true, action: 'reopen', ticketId: selectedTicket.id });
+                      }}
+                    >
+                      Request Reopen
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => setConfirmState({ isOpen: true, action: 'delete', ticketId: selectedTicket.id })}
+                    >
+                      Delete Ticket
+                    </button>
+                  )}
               </div>
             )}
           </div>
         )}
       </SlideOver>
+
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => { setConfirmState({ isOpen: false, action: null, ticketId: null }); setReopenReason(''); }}
+        onConfirm={executeConfirmAction}
+        title={confirmState.action === 'close' ? 'Close Ticket' : confirmState.action === 'reopen' ? 'Request Reopen' : 'Delete Ticket'}
+        description={
+          confirmState.action === 'close' 
+            ? 'Are you sure you want to close this ticket? No further transitions can be made.'
+            : confirmState.action === 'reopen'
+            ? 'Please provide a reason for reopening this ticket. An HR Manager must approve this request.'
+            : 'Are you sure you want to permanently delete this ticket? This action cannot be undone.'
+        }
+        confirmText={confirmState.action === 'close' ? 'Close Ticket' : confirmState.action === 'reopen' ? 'Submit Request' : 'Delete Ticket'}
+        variant={confirmState.action === 'close' ? 'warning' : confirmState.action === 'reopen' ? 'info' : 'danger'}
+        requireInput={confirmState.action === 'reopen'}
+        inputLabel="Reason for Reopening *"
+        inputPlaceholder="Why does this ticket need to be reopened?"
+        inputValue={reopenReason}
+        onInputChange={setReopenReason}
+        inputMinLength={5}
+      />
     </>
   );
 };

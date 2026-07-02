@@ -178,3 +178,60 @@ def get_ticket_with_transitions(*, session: Session, ticket_id: uuid.UUID) -> di
     ticket_data["valid_next_stages"] = [s.value for s in valid_stages]
     ticket_data["valid_next_statuses"] = [s.value for s in valid_statuses]
     return ticket_data
+
+
+# ---------------------------------------------------------------------------
+# Reopen Request
+# ---------------------------------------------------------------------------
+
+from app.ticket.models import TicketReopenRequest, ReopenRequestStatus
+from app.ticket.schemas import TicketReopenCreate, TicketReopenReview, TicketReopenRequestsPublic
+from datetime import datetime, timezone
+
+
+def request_reopen(*, session: Session, ticket_id: uuid.UUID, request_in: TicketReopenCreate, current_user: User) -> TicketReopenRequest:
+    db_ticket = get_ticket(session=session, ticket_id=ticket_id)
+    
+    if db_ticket.status not in (TicketStatus.CLOSED, TicketStatus.CANCELLED):
+        raise TicketValidationError(detail="Can only request reopen for closed or cancelled tickets.")
+        
+    req = TicketReopenRequest(
+        ticket_id=ticket_id,
+        requested_by=current_user.id,
+        reason=request_in.reason,
+        status=ReopenRequestStatus.PENDING
+    )
+    
+    return repository.create_reopen_request(session=session, request=req)
+
+
+def list_reopen_requests(*, session: Session, skip: int = 0, limit: int = 100) -> TicketReopenRequestsPublic:
+    requests = repository.list_reopen_requests(session=session, skip=skip, limit=limit)
+    count = repository.count_reopen_requests(session=session)
+    return TicketReopenRequestsPublic(data=requests, count=count)  # type: ignore
+
+
+def review_reopen_request(*, session: Session, request_id: uuid.UUID, review_in: TicketReopenReview, action: str, current_user: User) -> TicketReopenRequest:
+    req = repository.get_reopen_request(session=session, request_id=request_id)
+    if not req:
+        raise TicketNotFoundError(detail="Reopen request not found")
+        
+    if req.status != ReopenRequestStatus.PENDING:
+        raise TicketValidationError(detail="Reopen request is not pending")
+        
+    if action == "approve":
+        req.status = ReopenRequestStatus.APPROVED
+        db_ticket = get_ticket(session=session, ticket_id=req.ticket_id)
+        ticket_workflow.reopen_ticket(db_ticket)
+        repository.save_ticket(session=session, ticket=db_ticket)
+    elif action == "reject":
+        req.status = ReopenRequestStatus.REJECTED
+    else:
+        raise TicketValidationError(detail="Invalid action")
+        
+    req.reviewed_by = current_user.id
+    req.review_notes = review_in.notes
+    req.reviewed_at = datetime.now(timezone.utc)
+    
+    return repository.save_reopen_request(session=session, request=req)
+

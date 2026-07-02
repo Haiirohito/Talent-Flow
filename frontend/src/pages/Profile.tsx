@@ -4,7 +4,7 @@ import { useAuth } from '../components/AuthContext';
 import { fetchApi } from '../api/client';
 
 const Profile: React.FC = () => {
-  const { user, login, logout, hasPermission, permissions, refreshUser } = useAuth();
+  const { user, login, logout, hasPermission, permissions } = useAuth();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState(user?.full_name || '');

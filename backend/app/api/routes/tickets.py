@@ -20,6 +20,10 @@ from app.ticket.schemas import (
     TicketTransitionStage,
     TicketTransitionStatus,
     TicketUpdate,
+    TicketReopenCreate,
+    TicketReopenReview,
+    TicketReopenRequestRead,
+    TicketReopenRequestsPublic,
 )
 from app.users.schemas import Message
 
@@ -153,13 +157,45 @@ def close_ticket(*, session: SessionDep, ticket_id: uuid.UUID) -> Any:
 
 
 @router.post(
-    "/{ticket_id}/reopen",
+    "/{ticket_id}/reopen-request",
     dependencies=[Depends(require_permissions(Permission.TICKETS_UPDATE))],
-    response_model=TicketRead,
+    response_model=TicketReopenRequestRead,
 )
-def reopen_ticket(*, session: SessionDep, ticket_id: uuid.UUID) -> Any:
-    """Reopen a closed or cancelled ticket."""
-    return service.reopen_ticket(session=session, ticket_id=ticket_id)
+def request_reopen(
+    *, session: SessionDep, current_user: CurrentUser, ticket_id: uuid.UUID, body: TicketReopenCreate
+) -> Any:
+    """Request to reopen a closed or cancelled ticket."""
+    return service.request_reopen(
+        session=session, ticket_id=ticket_id, request_in=body, current_user=current_user
+    )
+
+
+@router.get(
+    "/reopen-requests/all",
+    dependencies=[Depends(require_permissions(Permission.TICKETS_REOPEN_APPROVE))],
+    response_model=TicketReopenRequestsPublic,
+)
+def list_reopen_requests(
+    session: SessionDep,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> Any:
+    """Retrieve a paginated list of reopen requests."""
+    return service.list_reopen_requests(session=session, skip=skip, limit=limit)
+
+
+@router.post(
+    "/reopen-requests/{request_id}/review",
+    dependencies=[Depends(require_permissions(Permission.TICKETS_REOPEN_APPROVE))],
+    response_model=TicketReopenRequestRead,
+)
+def review_reopen_request(
+    *, session: SessionDep, current_user: CurrentUser, request_id: uuid.UUID, body: TicketReopenReview, action: str = Query(...)
+) -> Any:
+    """Review a reopen request (approve or reject)."""
+    return service.review_reopen_request(
+        session=session, request_id=request_id, review_in=body, action=action, current_user=current_user
+    )
 
 
 @router.post(

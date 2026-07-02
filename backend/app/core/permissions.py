@@ -60,6 +60,7 @@ class Permission(StrEnum):
     TICKETS_READ = "tickets:read"
     TICKETS_UPDATE = "tickets:update"
     TICKETS_DELETE = "tickets:delete"
+    TICKETS_REOPEN_APPROVE = "tickets:reopen_approve"
 
     # Client management
     CLIENTS_READ = "clients:read"
@@ -91,6 +92,7 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.TICKETS_READ,
         Permission.TICKETS_UPDATE,
         Permission.TICKETS_DELETE,
+        Permission.TICKETS_REOPEN_APPROVE,
         Permission.CLIENTS_READ,
         Permission.CLIENTS_CREATE,
         Permission.CLIENTS_UPDATE,

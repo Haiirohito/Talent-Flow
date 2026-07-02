@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../components/AuthContext';
 import SlideOver from '../components/SlideOver';
+import { useToast } from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
+import StatusBadge from '../components/StatusBadge';
+import EmptyState from '../components/EmptyState';
+import { Briefcase, Plus } from '../components/icons';
 
 interface Client {
   id: string;
@@ -20,9 +25,8 @@ interface Client {
 const Clients: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const { hasPermission } = useAuth();
+  const toast = useToast();
 
   // Create client form state
   const [showCreate, setShowCreate] = useState(false);
@@ -36,7 +40,6 @@ const Clients: React.FC = () => {
     website: '',
     notes: '',
   });
-  const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Edit client state
@@ -51,7 +54,11 @@ const Clients: React.FC = () => {
     notes: '',
     is_active: true,
   });
-  const [editError, setEditError] = useState('');
+
+  const [confirmState, setConfirmState] = useState<{
+    isOpen: boolean;
+    clientId: string | null;
+  }>({ isOpen: false, clientId: null });
 
   const canCreate = hasPermission('clients:create');
   const canUpdate = hasPermission('clients:update');
@@ -62,7 +69,7 @@ const Clients: React.FC = () => {
       const data = await fetchApi('/clients/');
       setClients(data.data || data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch clients');
+      toast.error(err.message || 'Failed to fetch clients');
     } finally {
       setLoading(false);
     }
@@ -70,12 +77,12 @@ const Clients: React.FC = () => {
 
   useEffect(() => {
     loadClients();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Create Client ──
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreateError('');
     setCreating(true);
     try {
       await fetchApi('/clients/', {
@@ -91,10 +98,10 @@ const Clients: React.FC = () => {
       });
       setShowCreate(false);
       setCreateForm({ name: '', email: '', company_name: '', phone: '', address: '', website: '', notes: '' });
-      setSuccess('Client created successfully');
+      toast.success('Client created successfully');
       loadClients();
     } catch (err: any) {
-      setCreateError(err.message || 'Failed to create client');
+      toast.error(err.message || 'Failed to create client');
     } finally {
       setCreating(false);
     }
@@ -113,12 +120,10 @@ const Clients: React.FC = () => {
       notes: c.notes || '',
       is_active: c.is_active,
     });
-    setEditError('');
   };
 
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setEditError('');
     try {
       await fetchApi(`/clients/${editingId}`, {
         method: 'PATCH',
@@ -132,32 +137,31 @@ const Clients: React.FC = () => {
         }),
       });
       setEditingId(null);
-      setSuccess('Client updated successfully');
+      toast.success('Client updated successfully');
       loadClients();
     } catch (err: any) {
-      setEditError(err.message || 'Failed to update client');
+      toast.error(err.message || 'Failed to update client');
     }
   };
 
   // ── Delete Client ──
-  const handleDelete = async (clientId: string) => {
-    if (!window.confirm('Are you sure you want to delete this client?')) return;
+  const executeDelete = async () => {
+    const { clientId } = confirmState;
+    if (!clientId) return;
+
     try {
       await fetchApi(`/clients/${clientId}`, { method: 'DELETE' });
-      setSuccess('Client deleted successfully');
+      toast.success('Client deleted successfully');
       loadClients();
+      if (selectedClient?.id === clientId) {
+        setSelectedClient(null);
+      }
     } catch (err: any) {
-      alert(err.message || 'Failed to delete client');
+      toast.error(err.message || 'Failed to delete client');
+    } finally {
+      setConfirmState({ isOpen: false, clientId: null });
     }
   };
-
-  // Clear success message after timeout
-  useEffect(() => {
-    if (success) {
-      const t = setTimeout(() => setSuccess(''), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [success]);
 
   if (loading) {
     return (
@@ -165,7 +169,12 @@ const Clients: React.FC = () => {
         <header className="top-header">
           <span className="top-header-title">Clients</span>
         </header>
-        <div className="page-content"><div className="spinner">Loading…</div></div>
+        <div className="page-content">
+          <div className="empty-state">
+            <div className="spinner-icon" style={{ fontSize: '2rem', color: 'var(--color-primary)', marginBottom: '16px' }}>⟳</div>
+            <div>Loading clients...</div>
+          </div>
+        </div>
       </>
     );
   }
@@ -173,28 +182,29 @@ const Clients: React.FC = () => {
   return (
     <>
       <header className="top-header">
-        <span className="top-header-title">Client Management</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="sidebar-brand-icon">
+            <Briefcase />
+          </div>
+          <span className="top-header-title">Client Management</span>
+        </div>
         <div className="top-header-actions">
           <span className="text-secondary">{clients.length} client{clients.length !== 1 ? 's' : ''}</span>
           {canCreate && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? 'Cancel' : '+ New Client'}
+              {showCreate ? 'Cancel' : <><Plus /> New Client</>}
             </button>
           )}
         </div>
       </header>
 
       <div className="page-content">
-        {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
-
         {/* ── Create Client Form ── */}
         {showCreate && (
-          <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card animate-fadeInDown" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <span className="card-title">Create New Client</span>
             </div>
-            {createError && <div className="alert alert-error">{createError}</div>}
             <form onSubmit={handleCreate}>
               <div className="form-row">
                 <div className="form-group">
@@ -270,21 +280,25 @@ const Clients: React.FC = () => {
                   style={{ resize: 'vertical' }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={creating}>
-                {creating ? 'Creating…' : 'Create Client'}
-              </button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>
+                  {creating ? 'Creating…' : 'Create Client'}
+                </button>
+              </div>
             </form>
           </div>
         )}
 
         {/* ── Edit Client Form ── */}
         {editingId && (
-          <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card animate-fadeInDown" style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }}>
             <div className="card-header">
               <span className="card-title">Edit Client</span>
               <button className="btn btn-ghost btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
             </div>
-            {editError && <div className="alert alert-error">{editError}</div>}
             <form onSubmit={handleEdit}>
               <div className="form-row">
                 <div className="form-group">
@@ -293,6 +307,7 @@ const Clients: React.FC = () => {
                     className="form-input"
                     value={editForm.name}
                     onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                    required
                   />
                 </div>
                 <div className="form-group">
@@ -302,6 +317,7 @@ const Clients: React.FC = () => {
                     type="email"
                     value={editForm.email}
                     onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                    required
                   />
                 </div>
               </div>
@@ -364,47 +380,54 @@ const Clients: React.FC = () => {
                   </select>
                 </div>
               </div>
-              <button type="submit" className="btn btn-primary">Save Changes</button>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button type="submit" className="btn btn-primary">Save Changes</button>
+              </div>
             </form>
           </div>
         )}
 
         {/* ── Clients Table ── */}
         <div className="table-card">
-          <div className="table-card-header">
-            <span className="table-card-title">All Clients</span>
-          </div>
           <div className="table-wrapper">
             <table className="table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Company</th>
-                  <th>Phone</th>
+                  <th>Client</th>
+                  <th>Contact Info</th>
                   <th>Status</th>
-                  <th>Created</th>
-                  {(canUpdate || canDelete) && <th>Actions</th>}
+                  <th>Added</th>
+                  {(canUpdate || canDelete) && <th style={{ textAlign: 'right' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {clients.map((c: Client) => (
-                  <tr key={c.id} className="row-clickable" onClick={() => setSelectedClient(c)}>
-                    <td>{c.name}</td>
-                    <td>{c.email}</td>
-                    <td>{c.company_name || '—'}</td>
-                    <td>{c.phone || '—'}</td>
+                  <tr key={c.id} className="row-clickable animate-fadeInUp" onClick={() => setSelectedClient(c)}>
                     <td>
-                      <span className={`badge ${c.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                        {c.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      <div style={{ fontWeight: 500, color: 'var(--color-text)' }}>{c.name}</div>
+                      {c.company_name && (
+                        <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                          {c.company_name}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ color: 'var(--color-text)' }}>{c.email}</div>
+                      {c.phone && (
+                        <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                          {c.phone}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <StatusBadge type="active" value={c.is_active ? 'active' : 'inactive'} />
                     </td>
                     <td className="text-muted">
                       {c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'}
                     </td>
                     {(canUpdate || canDelete) && (
                       <td onClick={e => e.stopPropagation()}>
-                        <div className="flex-gap">
+                        <div className="flex-gap" style={{ justifyContent: 'flex-end' }}>
                           {canUpdate && (
                             <button
                               className="btn btn-outline btn-sm"
@@ -417,7 +440,10 @@ const Clients: React.FC = () => {
                           {canDelete && (
                             <button
                               className="btn btn-danger btn-sm"
-                              onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setConfirmState({ isOpen: true, clientId: c.id });
+                              }}
                             >
                               Delete
                             </button>
@@ -429,8 +455,16 @@ const Clients: React.FC = () => {
                 ))}
                 {clients.length === 0 && (
                   <tr>
-                    <td colSpan={(canUpdate || canDelete) ? 7 : 6}>
-                      <div className="empty-state">No clients found.</div>
+                    <td colSpan={(canUpdate || canDelete) ? 5 : 4}>
+                      <EmptyState 
+                        title="No clients found" 
+                        description="There are currently no clients in the system."
+                        action={canCreate ? (
+                          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+                            Create Client
+                          </button>
+                        ) : undefined}
+                      />
                     </td>
                   </tr>
                 )}
@@ -444,14 +478,28 @@ const Clients: React.FC = () => {
         isOpen={!!selectedClient}
         onClose={() => setSelectedClient(null)}
         title={selectedClient ? selectedClient.name : ''}
+        variant="wide"
       >
         {selectedClient && (
-          <div>
+          <div className="ticket-details-slideover">
+            <div style={{ marginBottom: 24 }}>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '1.5rem' }}>{selectedClient.name}</h2>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                {selectedClient.company_name && (
+                  <>
+                    <span className="text-secondary" style={{ fontWeight: 500 }}>{selectedClient.company_name}</span>
+                    <span className="text-muted">•</span>
+                  </>
+                )}
+                <StatusBadge type="active" value={selectedClient.is_active ? 'active' : 'inactive'} />
+              </div>
+            </div>
+
             <div className="grid-2">
               <div className="glance-section">
                 <span className="glance-label">Email</span>
                 <div className="glance-value">
-                  <a href={`mailto:${selectedClient.email}`} style={{ color: 'var(--color-primary)' }}>
+                  <a href={`mailto:${selectedClient.email}`} style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
                     {selectedClient.email}
                   </a>
                 </div>
@@ -464,57 +512,81 @@ const Clients: React.FC = () => {
 
             <div className="grid-2">
               <div className="glance-section">
-                <span className="glance-label">Company</span>
-                <div className="glance-value">{selectedClient.company_name || '—'}</div>
+                <span className="glance-label">Website</span>
+                <div className="glance-value">
+                  {selectedClient.website ? (
+                    <a href={selectedClient.website.startsWith('http') ? selectedClient.website : `https://${selectedClient.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+                      {selectedClient.website}
+                    </a>
+                  ) : '—'}
+                </div>
               </div>
               <div className="glance-section">
-                <span className="glance-label">Status</span>
-                <span className={`badge ${selectedClient.is_active ? 'badge-active' : 'badge-inactive'}`}>
-                  {selectedClient.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <span className="glance-label">Address</span>
+                <div className="glance-value">{selectedClient.address || '—'}</div>
               </div>
-            </div>
-
-            <div className="glance-section">
-              <span className="glance-label">Website</span>
-              <div className="glance-value">
-                {selectedClient.website ? (
-                  <a href={selectedClient.website.startsWith('http') ? selectedClient.website : `https://${selectedClient.website}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)' }}>
-                    {selectedClient.website}
-                  </a>
-                ) : '—'}
-              </div>
-            </div>
-
-            <div className="glance-section">
-              <span className="glance-label">Address</span>
-              <div className="glance-value">{selectedClient.address || '—'}</div>
             </div>
 
             <div className="glance-section">
               <span className="glance-label">Notes</span>
               {selectedClient.notes ? (
-                <div className="glance-description">{selectedClient.notes}</div>
+                <div className="glance-description" style={{ whiteSpace: 'pre-wrap' }}>{selectedClient.notes}</div>
               ) : (
                 <div className="text-muted" style={{ fontStyle: 'italic', fontSize: '0.875rem' }}>No notes provided.</div>
               )}
             </div>
-
-            <div className="glance-section">
-              <span className="glance-label">Created At</span>
-              <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
-                {selectedClient.created_at ? new Date(selectedClient.created_at).toLocaleString() : '—'}
+            
+            <div className="grid-2">
+              <div className="glance-section">
+                <span className="glance-label">Created At</span>
+                <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
+                  {selectedClient.created_at ? new Date(selectedClient.created_at).toLocaleString() : '—'}
+                </div>
+              </div>
+              <div className="glance-section">
+                <span className="glance-label">Last Updated</span>
+                <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
+                  {selectedClient.updated_at ? new Date(selectedClient.updated_at).toLocaleString() : '—'}
+                </div>
               </div>
             </div>
-            <div className="glance-section">
-              <span className="glance-label">Last Updated</span>
-              <div className="glance-value text-secondary" style={{ fontSize: '0.875rem' }}>
-                {selectedClient.updated_at ? new Date(selectedClient.updated_at).toLocaleString() : '—'}
+            
+            {(canUpdate || canDelete) && (
+              <div style={{ marginTop: 40, paddingTop: 20, borderTop: '1px solid var(--color-border)', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                 {canUpdate && (
+                    <button 
+                      className="btn btn-outline" 
+                      onClick={() => {
+                        setSelectedClient(null);
+                        startEdit(selectedClient);
+                      }}
+                    >
+                      Edit Client
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => setConfirmState({ isOpen: true, clientId: selectedClient.id })}
+                    >
+                      Delete Client
+                    </button>
+                  )}
               </div>
-            </div>
+            )}
           </div>
         )}
       </SlideOver>
+
+      <ConfirmModal
+        isOpen={confirmState.isOpen}
+        onClose={() => setConfirmState({ isOpen: false, clientId: null })}
+        onConfirm={executeDelete}
+        title="Delete Client"
+        description="Are you sure you want to permanently delete this client? This action cannot be undone."
+        confirmText="Delete Client"
+        variant="danger"
+      />
     </>
   );
 };

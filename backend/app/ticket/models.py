@@ -103,3 +103,41 @@ class RequirementTicket(SQLModel, table=True):
         default_factory=_get_datetime_utc,
         sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
     )
+
+
+class ReopenRequestStatus(StrEnum):
+    """Status of a request to reopen a closed or cancelled ticket."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class TicketReopenRequest(SQLModel, table=True):
+    __tablename__ = "ticket_reopen_request"  # type: ignore
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    ticket_id: uuid.UUID = Field(foreign_key="requirement_ticket.id", index=True)
+    
+    requested_by: uuid.UUID = Field(foreign_key="users.id")
+    reason: str = Field(max_length=1000)
+
+    status: ReopenRequestStatus = Field(sa_type=String, default=ReopenRequestStatus.PENDING)
+
+    reviewed_by: uuid.UUID | None = Field(default=None, foreign_key="users.id")
+    review_notes: str | None = Field(default=None, max_length=1000)
+    reviewed_at: datetime | None = Field(
+        default=None,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+
+    created_at: datetime | None = Field(
+        default_factory=_get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+    updated_at: datetime | None = Field(
+        default_factory=_get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+
