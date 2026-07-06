@@ -18,7 +18,6 @@ from app.ticket.workflow.exceptions import TicketNotFoundError, TicketValidation
 from app.ticket.workflow.transitions import get_valid_next_stages, get_valid_next_statuses
 from app.users.models import User
 
-
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------

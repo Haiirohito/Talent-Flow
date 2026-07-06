@@ -13,10 +13,7 @@ from app.ticket.workflow.transitions import (
     STAGE_ORDER,
     can_transition_stage,
     can_transition_status,
-    get_valid_next_stages,
-    get_valid_next_statuses,
 )
-
 
 # ---------------------------------------------------------------------------
 # Stage transitions

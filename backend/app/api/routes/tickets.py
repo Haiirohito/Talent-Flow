@@ -16,14 +16,14 @@ from app.ticket.schemas import (
     TicketCreate,
     TicketRead,
     TicketReadWithTransitions,
+    TicketReopenCreate,
+    TicketReopenRequestRead,
+    TicketReopenRequestsPublic,
+    TicketReopenReview,
     TicketsPublic,
     TicketTransitionStage,
     TicketTransitionStatus,
     TicketUpdate,
-    TicketReopenCreate,
-    TicketReopenReview,
-    TicketReopenRequestRead,
-    TicketReopenRequestsPublic,
 )
 from app.users.schemas import Message
 
@@ -190,7 +190,7 @@ def list_reopen_requests(
     response_model=TicketReopenRequestRead,
 )
 def review_reopen_request(
-    *, session: SessionDep, current_user: CurrentUser, request_id: uuid.UUID, body: TicketReopenReview, action: str = Query(...)
+    *, session: SessionDep, current_user: CurrentUser, request_id: uuid.UUID, body: TicketReopenReview, action: str = Query(...)  # noqa: E501
 ) -> Any:
     """Review a reopen request (approve or reject)."""
     return service.review_reopen_request(
