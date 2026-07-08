@@ -69,6 +69,7 @@ def _get_datetime_utc() -> datetime:
 
 class RequirementTicket(SQLModel, table=True):
     __tablename__ = "requirement_ticket"  # type: ignore
+    model_config = {"use_enum_values": True}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
@@ -84,6 +85,11 @@ class RequirementTicket(SQLModel, table=True):
     priority: TicketPriority = Field(sa_type=String)
     current_stage: TicketStage = Field(sa_type=String)
     status: TicketStatus = Field(sa_type=String)
+
+    # Assignment
+    assigned_team_lead_id: uuid.UUID | None = Field(
+        default=None, foreign_key="users.id"
+    )
 
     # Soft-delete fields
     deleted_at: datetime | None = Field(
@@ -105,6 +111,23 @@ class RequirementTicket(SQLModel, table=True):
     )
 
 
+class TicketRecruiterAssignment(SQLModel, table=True):
+    """A recruiter assigned to work on a specific ticket."""
+
+    __tablename__ = "ticket_recruiter_assignment"  # type: ignore
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    ticket_id: uuid.UUID = Field(foreign_key="requirement_ticket.id", index=True)
+    recruiter_id: uuid.UUID = Field(foreign_key="users.id")
+    assigned_by: uuid.UUID = Field(foreign_key="users.id")
+
+    assigned_at: datetime | None = Field(
+        default_factory=_get_datetime_utc,
+        sa_type=DateTime(timezone=True),  # type: ignore[call-overload]
+    )
+
+
 class ReopenRequestStatus(StrEnum):
     """Status of a request to reopen a closed or cancelled ticket."""
 
@@ -115,6 +138,7 @@ class ReopenRequestStatus(StrEnum):
 
 class TicketReopenRequest(SQLModel, table=True):
     __tablename__ = "ticket_reopen_request"  # type: ignore
+    model_config = {"use_enum_values": True}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { fetchApi } from '../api/client';
 import { canModifyUser as canModifyUserByRole } from '../utils/roleUtils';
 
-export type UserRole = 'admin' | 'hr_manager' | 'recruiter' | 'employee' | 'viewer';
+export type UserRole = 'admin' | 'team_lead' | 'recruiter' | 'employee' | 'viewer';
 
 export interface User {
   id: string;

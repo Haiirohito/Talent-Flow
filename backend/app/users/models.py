@@ -15,7 +15,7 @@ class UserRole(StrEnum):
     """Extensible user roles. Add new roles here and update ROLE_PERMISSIONS in permissions.py."""
 
     ADMIN = "admin"
-    HR_MANAGER = "hr_manager"
+    TEAM_LEAD = "team_lead"
     RECRUITER = "recruiter"
     EMPLOYEE = "employee"
     VIEWER = "viewer"

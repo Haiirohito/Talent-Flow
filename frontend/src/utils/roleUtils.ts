@@ -3,7 +3,7 @@ import type { UserRole } from '../components/AuthContext';
 // Role hierarchy — lower index = higher privilege (mirrors backend ROLE_HIERARCHY)
 export const ROLE_HIERARCHY: UserRole[] = [
   'admin',
-  'hr_manager',
+  'team_lead',
   'recruiter',
   'employee',
   'viewer',
@@ -11,7 +11,7 @@ export const ROLE_HIERARCHY: UserRole[] = [
 
 const ALL_ROLES: { value: UserRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
-  { value: 'hr_manager', label: 'HR Manager' },
+  { value: 'team_lead', label: 'Team Lead' },
   { value: 'recruiter', label: 'Recruiter' },
   { value: 'employee', label: 'Employee' },
   { value: 'viewer', label: 'Viewer' },

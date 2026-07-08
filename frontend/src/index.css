@@ -52,8 +52,8 @@
   /* ── Badge Palettes ── */
   --color-badge-admin: #eef2ff;
   --color-badge-admin-text: #4338ca;
-  --color-badge-hr: #f5f3ff;
-  --color-badge-hr-text: #6d28d9;
+  --color-badge-team-lead: #f5f3ff;
+  --color-badge-team-lead-text: #6d28d9;
   --color-badge-recruiter: #eff6ff;
   --color-badge-recruiter-text: #1d4ed8;
   --color-badge-employee: #f0fdf4;
@@ -927,8 +927,8 @@ textarea.form-input {
 .badge-admin { background: var(--color-badge-admin); color: var(--color-badge-admin-text); }
 .badge-admin .badge-dot { background: var(--color-badge-admin-text); }
 
-.badge-hr_manager { background: var(--color-badge-hr); color: var(--color-badge-hr-text); }
-.badge-hr_manager .badge-dot { background: var(--color-badge-hr-text); }
+.badge-team_lead { background: var(--color-badge-team-lead); color: var(--color-badge-team-lead-text); }
+.badge-team_lead .badge-dot { background: var(--color-badge-team-lead-text); }
 
 .badge-recruiter { background: var(--color-badge-recruiter); color: var(--color-badge-recruiter-text); }
 .badge-recruiter .badge-dot { background: var(--color-badge-recruiter-text); }

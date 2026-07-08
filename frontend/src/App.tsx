@@ -17,6 +17,7 @@ import InviteUser from './pages/InviteUser';
 import AdminPanel from './pages/AdminPanel';
 import Settings from './pages/Settings';
 import EmailTest from './pages/EmailTest';
+import MyTeam from './pages/MyTeam';
 
 const App: React.FC = () => {
   return (
@@ -45,6 +46,9 @@ const App: React.FC = () => {
                 </Route>
                 <Route element={<PermissionRoute permission="tickets:reopen_approve" />}>
                   <Route path="/reopen-requests" element={<ReopenRequests />} />
+                </Route>
+                <Route element={<PermissionRoute permission="team:manage" />}>
+                  <Route path="/my-team" element={<MyTeam />} />
                 </Route>
                 <Route element={<PermissionRoute permission="users:invite" />}>
                   <Route path="/invite" element={<InviteUser />} />

@@ -10,10 +10,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'dashboard:admin', 'dashboard:hr', 'dashboard:recruitment', 'dashboard:employee',
     'system:settings', 'system:email_test',
   ],
-  hr_manager: [
+  team_lead: [
     'users:read', 'users:create', 'users:update', 'users:invite',
     'profile:read', 'profile:update',
     'dashboard:hr', 'dashboard:employee',
+    'tickets:create', 'tickets:read', 'tickets:update', 'tickets:delete',
+    'tickets:reopen_approve', 'tickets:assign',
+    'clients:read', 'clients:create', 'clients:update', 'clients:delete',
+    'team:manage',
   ],
   recruiter: [
     'users:read',
@@ -34,10 +38,14 @@ const ALL_PERMISSIONS = [
   'users:read', 'users:create', 'users:update', 'users:delete', 'users:invite',
   'profile:read', 'profile:update', 'profile:delete',
   'dashboard:admin', 'dashboard:hr', 'dashboard:recruitment', 'dashboard:employee',
+  'tickets:create', 'tickets:read', 'tickets:update', 'tickets:delete',
+  'tickets:reopen_approve', 'tickets:assign',
+  'clients:read', 'clients:create', 'clients:update', 'clients:delete',
+  'team:manage',
   'system:settings', 'system:email_test',
 ];
 
-const ALL_ROLES = ['admin', 'hr_manager', 'recruiter', 'employee', 'viewer'];
+const ALL_ROLES = ['admin', 'team_lead', 'recruiter', 'employee', 'viewer'];
 
 const AdminPanel: React.FC = () => {
   const { user, permissions } = useAuth();

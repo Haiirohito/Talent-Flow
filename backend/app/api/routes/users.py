@@ -37,7 +37,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 ROLE_HIERARCHY: list[UserRole] = [
     UserRole.ADMIN,
-    UserRole.HR_MANAGER,
+    UserRole.TEAM_LEAD,
     UserRole.RECRUITER,
     UserRole.EMPLOYEE,
     UserRole.VIEWER,
@@ -304,7 +304,7 @@ def read_user_by_id(
         raise HTTPException(status_code=404, detail="User not found")
     if user == current_user:
         return user
-    if current_user.role not in (UserRole.ADMIN, UserRole.HR_MANAGER):
+    if current_user.role not in (UserRole.ADMIN, UserRole.TEAM_LEAD):
         raise HTTPException(
             status_code=403,
             detail="The user doesn't have enough privileges",

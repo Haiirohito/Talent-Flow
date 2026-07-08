@@ -3,11 +3,12 @@
 Pure database operations. No business logic.
 """
 
+import uuid
 from datetime import datetime, timezone
 
 from sqlmodel import Session, col, func, select
 
-from app.ticket.models import RequirementTicket, TicketReopenRequest
+from app.ticket.models import RequirementTicket, TicketRecruiterAssignment, TicketReopenRequest
 from app.ticket.schemas import TicketUpdate
 
 
@@ -37,25 +38,71 @@ def get_ticket_by_number(*, session: Session, ticket_number: str) -> Requirement
     return session.exec(statement).first()
 
 
-def list_tickets(*, session: Session, skip: int = 0, limit: int = 100) -> list[RequirementTicket]:
-    """Return a paginated list of tickets ordered by created_at desc (excludes soft-deleted)."""
+def list_tickets(
+    *,
+    session: Session,
+    skip: int = 0,
+    limit: int = 100,
+    recruiter_id: uuid.UUID | None = None,
+    team_lead_id: uuid.UUID | None = None,
+) -> list[RequirementTicket]:
+    """Return a paginated list of tickets ordered by created_at desc (excludes soft-deleted).
+
+    Filters:
+    - recruiter_id: only tickets where this recruiter is assigned
+    - team_lead_id: only tickets assigned to this team lead OR created by them
+    """
+    from sqlalchemy import or_
+
     statement = (
         select(RequirementTicket)
         .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
-        .order_by(col(RequirementTicket.created_at).desc())
-        .offset(skip)
-        .limit(limit)
     )
+    if recruiter_id:
+        from app.ticket.models import TicketRecruiterAssignment
+        statement = statement.join(
+            TicketRecruiterAssignment,
+            RequirementTicket.id == TicketRecruiterAssignment.ticket_id
+        ).where(TicketRecruiterAssignment.recruiter_id == recruiter_id)
+    elif team_lead_id:
+        statement = statement.where(
+            or_(
+                RequirementTicket.assigned_team_lead_id == team_lead_id,
+                RequirementTicket.created_by == team_lead_id,
+            )
+        )
+
+    statement = statement.order_by(col(RequirementTicket.created_at).desc()).offset(skip).limit(limit)
     return list(session.exec(statement).all())
 
 
-def count_tickets(*, session: Session) -> int:
-    """Return the total number of non-deleted tickets."""
+def count_tickets(
+    *,
+    session: Session,
+    recruiter_id: uuid.UUID | None = None,
+    team_lead_id: uuid.UUID | None = None,
+) -> int:
+    """Return the total number of non-deleted tickets (matching same filters as list_tickets)."""
+    from sqlalchemy import or_
+
     statement = (
         select(func.count())
         .select_from(RequirementTicket)
         .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
     )
+    if recruiter_id:
+        from app.ticket.models import TicketRecruiterAssignment
+        statement = statement.join(
+            TicketRecruiterAssignment,
+            RequirementTicket.id == TicketRecruiterAssignment.ticket_id
+        ).where(TicketRecruiterAssignment.recruiter_id == recruiter_id)
+    elif team_lead_id:
+        statement = statement.where(
+            or_(
+                RequirementTicket.assigned_team_lead_id == team_lead_id,
+                RequirementTicket.created_by == team_lead_id,
+            )
+        )
     return session.exec(statement).one()
 
 
@@ -148,3 +195,61 @@ def save_reopen_request(*, session: Session, request: TicketReopenRequest) -> Ti
     session.commit()
     session.refresh(request)
     return request
+
+
+def delete_reopen_request(*, session: Session, request: TicketReopenRequest) -> None:
+    session.delete(request)
+    session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Ticket Recruiter Assignments
+# ---------------------------------------------------------------------------
+
+
+def create_recruiter_assignment(
+    *, session: Session, assignment: TicketRecruiterAssignment
+) -> TicketRecruiterAssignment:
+    session.add(assignment)
+    session.commit()
+    session.refresh(assignment)
+    return assignment
+
+
+def get_recruiter_assignment(
+    *, session: Session, ticket_id, recruiter_id
+) -> TicketRecruiterAssignment | None:
+    statement = select(TicketRecruiterAssignment).where(
+        TicketRecruiterAssignment.ticket_id == ticket_id,
+        TicketRecruiterAssignment.recruiter_id == recruiter_id,
+    )
+    return session.exec(statement).first()
+
+
+def list_recruiter_assignments(
+    *, session: Session, ticket_id
+) -> list[TicketRecruiterAssignment]:
+    statement = (
+        select(TicketRecruiterAssignment)
+        .where(TicketRecruiterAssignment.ticket_id == ticket_id)
+        .order_by(col(TicketRecruiterAssignment.assigned_at).desc())
+    )
+    return list(session.exec(statement).all())
+
+
+def delete_recruiter_assignment(
+    *, session: Session, assignment: TicketRecruiterAssignment
+) -> None:
+    session.delete(assignment)
+    session.commit()
+
+
+def delete_all_recruiter_assignments(*, session: Session, ticket_id) -> None:
+    """Remove all recruiter assignments for a ticket."""
+    statement = select(TicketRecruiterAssignment).where(
+        TicketRecruiterAssignment.ticket_id == ticket_id
+    )
+    assignments = session.exec(statement).all()
+    for a in assignments:
+        session.delete(a)
+    session.commit()

@@ -29,6 +29,7 @@ const DashboardLayout: React.FC = () => {
   const canViewClients = hasPermission('clients:read');
   const canViewTickets = hasPermission('tickets:read');
   const canApproveReopens = hasPermission('tickets:reopen_approve');
+  const canManageTeam = hasPermission('team:manage');
   const canTestEmail = hasPermission('system:email_test');
   const canViewSettings = hasPermission('system:settings');
 
@@ -80,7 +81,7 @@ const DashboardLayout: React.FC = () => {
             Dashboard
           </NavLink>
 
-          {(canViewTickets || canApproveReopens) && (
+          {(canViewTickets || canApproveReopens || canManageTeam) && (
             <>
               <span className="sidebar-section-label">Hiring</span>
               {canViewTickets && (
@@ -102,6 +103,17 @@ const DashboardLayout: React.FC = () => {
                 >
                   <RotateCcw />
                   Reopen Requests
+                </NavLink>
+              )}
+
+              {canManageTeam && (
+                <NavLink
+                  to="/my-team"
+                  className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Users />
+                  {user?.role === 'admin' ? 'Teams' : 'My Team'}
                 </NavLink>
               )}
             </>

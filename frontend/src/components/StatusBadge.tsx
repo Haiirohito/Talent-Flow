@@ -14,7 +14,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ type, value, label, className
   let baseClass = 'badge ';
 
   if (type === 'role') {
-    // Roles: admin, hr_manager, recruiter, employee, viewer
+    // Roles: admin, team_lead, recruiter, employee, viewer
     baseClass += `badge-${normalizedValue} badge-user`;
   } else if (type === 'active') {
     // Active boolean strings: "true", "false", "active", "inactive"

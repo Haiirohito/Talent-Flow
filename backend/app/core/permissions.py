@@ -68,6 +68,12 @@ class Permission(StrEnum):
     CLIENTS_UPDATE = "clients:update"
     CLIENTS_DELETE = "clients:delete"
 
+    # Team management
+    TEAM_MANAGE = "team:manage"
+
+    # Ticket assignment
+    TICKETS_ASSIGN = "tickets:assign"
+
     # System / utilities
     SYSTEM_SETTINGS = "system:settings"
     SYSTEM_EMAIL_TEST = "system:email_test"
@@ -79,7 +85,7 @@ class Permission(StrEnum):
 
 ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
     UserRole.ADMIN: set(Permission),  # Admin gets everything
-    UserRole.HR_MANAGER: {
+    UserRole.TEAM_LEAD: {
         Permission.USERS_READ,
         Permission.USERS_CREATE,
         Permission.USERS_UPDATE,
@@ -93,10 +99,10 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.TICKETS_UPDATE,
         Permission.TICKETS_DELETE,
         Permission.TICKETS_REOPEN_APPROVE,
+        Permission.TICKETS_ASSIGN,
         Permission.CLIENTS_READ,
         Permission.CLIENTS_CREATE,
-        Permission.CLIENTS_UPDATE,
-        Permission.CLIENTS_DELETE,
+        Permission.TEAM_MANAGE,
     },
     UserRole.RECRUITER: {
         Permission.USERS_READ,
@@ -104,7 +110,6 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.PROFILE_UPDATE,
         Permission.DASHBOARD_RECRUITMENT,
         Permission.DASHBOARD_EMPLOYEE,
-        Permission.TICKETS_CREATE,
         Permission.TICKETS_READ,
         Permission.TICKETS_UPDATE,
         Permission.CLIENTS_READ,

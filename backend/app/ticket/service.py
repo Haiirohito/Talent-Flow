@@ -16,7 +16,7 @@ from app.ticket.utils import generate_ticket_number
 from app.ticket.workflow import ticket_workflow
 from app.ticket.workflow.exceptions import TicketNotFoundError, TicketValidationError
 from app.ticket.workflow.transitions import get_valid_next_stages, get_valid_next_statuses
-from app.users.models import User
+from app.users.models import User, UserRole
 
 # ---------------------------------------------------------------------------
 # CRUD
@@ -47,6 +47,7 @@ def create_ticket(*, session: Session, ticket_in: TicketCreate, current_user: Us
         current_stage=TicketStage.REQUIREMENT_CREATED,
         status=TicketStatus.ACTIVE,
         created_by=current_user.id,
+        assigned_team_lead_id=current_user.id if current_user.role == UserRole.TEAM_LEAD else None,
     )
 
     return repository.create_ticket(session=session, ticket=ticket)
@@ -68,11 +69,39 @@ def get_ticket_by_number(*, session: Session, ticket_number: str) -> Requirement
     return ticket
 
 
-def list_tickets(*, session: Session, skip: int = 0, limit: int = 100) -> TicketsPublic:
-    """Return a paginated list of tickets."""
-    tickets = repository.list_tickets(session=session, skip=skip, limit=limit)
-    count = repository.count_tickets(session=session)
-    return TicketsPublic(data=tickets, count=count)  # type: ignore
+def list_tickets(*, session: Session, current_user: User, skip: int = 0, limit: int = 100) -> TicketsPublic:
+    """Return a paginated list of tickets scoped by role.
+
+    - Admin: sees all tickets
+    - Team Lead: sees only tickets assigned to them or created by them
+    - Recruiter: sees only tickets assigned to them via TicketRecruiterAssignment
+    """
+    recruiter_id = current_user.id if current_user.role == UserRole.RECRUITER else None
+    team_lead_id = current_user.id if current_user.role == UserRole.TEAM_LEAD else None
+
+    tickets = repository.list_tickets(
+        session=session, skip=skip, limit=limit,
+        recruiter_id=recruiter_id, team_lead_id=team_lead_id,
+    )
+    count = repository.count_tickets(
+        session=session,
+        recruiter_id=recruiter_id, team_lead_id=team_lead_id,
+    )
+
+    # Enrich with team lead names (cached to avoid repeated lookups)
+    lead_cache: dict[str, str | None] = {}
+    enriched = []
+    for ticket in tickets:
+        data = ticket.model_dump()
+        if ticket.assigned_team_lead_id:
+            lid = str(ticket.assigned_team_lead_id)
+            if lid not in lead_cache:
+                lead = session.get(User, ticket.assigned_team_lead_id)
+                lead_cache[lid] = lead.full_name if lead else None
+            data["assigned_team_lead_name"] = lead_cache[lid]
+        enriched.append(data)
+
+    return TicketsPublic(data=enriched, count=count)  # type: ignore
 
 
 def update_ticket(*, session: Session, ticket_id: uuid.UUID, ticket_in: TicketUpdate) -> RequirementTicket:
@@ -168,7 +197,7 @@ def cancel_ticket(*, session: Session, ticket_id: uuid.UUID) -> RequirementTicke
 
 
 def get_ticket_with_transitions(*, session: Session, ticket_id: uuid.UUID) -> dict:
-    """Return a ticket enriched with valid next transitions."""
+    """Return a ticket enriched with valid next transitions and assignment info."""
     ticket = get_ticket(session=session, ticket_id=ticket_id)
     valid_stages = get_valid_next_stages(ticket.current_stage)
     valid_statuses = get_valid_next_statuses(ticket.status)
@@ -176,6 +205,31 @@ def get_ticket_with_transitions(*, session: Session, ticket_id: uuid.UUID) -> di
     ticket_data = ticket.model_dump()
     ticket_data["valid_next_stages"] = [s.value for s in valid_stages]
     ticket_data["valid_next_statuses"] = [s.value for s in valid_statuses]
+
+    # Enrich with assignment info
+    if ticket.assigned_team_lead_id:
+        lead = session.get(User, ticket.assigned_team_lead_id)
+        ticket_data["assigned_team_lead_name"] = lead.full_name if lead else None
+    else:
+        ticket_data["assigned_team_lead_name"] = None
+
+    # Assigned recruiters — fixed N+1: call session.get once per recruiter
+    from app.ticket.models import TicketRecruiterAssignment
+    assignments = repository.list_recruiter_assignments(
+        session=session, ticket_id=ticket_id
+    )
+    assigned_recruiters = []
+    for a in assignments:
+        recruiter = session.get(User, a.recruiter_id)
+        assigned_recruiters.append({
+            "id": str(a.id),
+            "recruiter_id": str(a.recruiter_id),
+            "recruiter_name": recruiter.full_name if recruiter else None,
+            "recruiter_email": recruiter.email if recruiter else None,
+            "assigned_at": a.assigned_at.isoformat() if a.assigned_at else None,
+        })
+    ticket_data["assigned_recruiters"] = assigned_recruiters
+
     return ticket_data
 
 
@@ -234,3 +288,152 @@ def review_reopen_request(*, session: Session, request_id: uuid.UUID, review_in:
     
     return repository.save_reopen_request(session=session, request=req)
 
+
+def delete_reopen_request(*, session: Session, request_id: uuid.UUID) -> None:
+    """Delete a reopen request."""
+    req = repository.get_reopen_request(session=session, request_id=request_id)
+    if not req:
+        raise TicketNotFoundError(detail="Reopen request not found")
+    
+    repository.delete_reopen_request(session=session, request=req)
+
+
+# ---------------------------------------------------------------------------
+# Ticket Assignment
+# ---------------------------------------------------------------------------
+
+from app.ticket.models import TicketRecruiterAssignment
+from app.ticket.schemas import TicketAssignTeamLead, TicketAssignRecruiters, TicketAssignmentRead
+from app.users.models import UserRole
+from app.team.models import TeamMember
+
+
+def assign_team_lead(
+    *, session: Session, ticket_id: uuid.UUID, body: TicketAssignTeamLead, current_user: User
+) -> RequirementTicket:
+    """Assign (or unassign) a team lead to a ticket."""
+    if current_user.role != UserRole.ADMIN:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Only admins can change the team lead assigned to a ticket.")
+
+    db_ticket = get_ticket(session=session, ticket_id=ticket_id)
+
+    if body.team_lead_id is not None:
+        lead = session.get(User, body.team_lead_id)
+        if not lead:
+            raise TicketValidationError(detail="Team lead not found")
+        if lead.role != UserRole.TEAM_LEAD:
+            raise TicketValidationError(detail="User is not a team lead")
+
+    # If changing team lead, remove existing recruiter assignments
+    if db_ticket.assigned_team_lead_id and db_ticket.assigned_team_lead_id != body.team_lead_id:
+        repository.delete_all_recruiter_assignments(session=session, ticket_id=ticket_id)
+
+    db_ticket.assigned_team_lead_id = body.team_lead_id
+    return repository.save_ticket(session=session, ticket=db_ticket)
+
+
+def assign_recruiters(
+    *, session: Session, ticket_id: uuid.UUID, body: TicketAssignRecruiters, current_user: User
+) -> list[TicketAssignmentRead]:
+    """Assign recruiters to a ticket. Only the assigned team lead (or admin) can do this."""
+    db_ticket = get_ticket(session=session, ticket_id=ticket_id)
+
+    # Verify caller is the assigned team lead or admin
+    if current_user.role != UserRole.ADMIN:
+        if db_ticket.assigned_team_lead_id != current_user.id:
+            raise TicketValidationError(
+                detail="Only the assigned team lead or admin can assign recruiters"
+            )
+
+    from sqlmodel import select
+    results = []
+    for recruiter_id in body.recruiter_ids:
+        # Validate recruiter exists and is a recruiter
+        recruiter = session.get(User, recruiter_id)
+        if not recruiter or recruiter.role != UserRole.RECRUITER:
+            raise TicketValidationError(
+                detail=f"User {recruiter_id} is not a valid recruiter"
+            )
+
+        # Validate recruiter is in the team lead's team
+        if current_user.role != UserRole.ADMIN:
+            team_member = session.exec(
+                select(TeamMember).where(
+                    TeamMember.team_lead_id == current_user.id,
+                    TeamMember.recruiter_id == recruiter_id,
+                )
+            ).first()
+            if not team_member:
+                raise TicketValidationError(
+                    detail=f"Recruiter {recruiter.full_name or recruiter.email} is not in your team"
+                )
+
+        # Skip if already assigned
+        existing = repository.get_recruiter_assignment(
+            session=session, ticket_id=ticket_id, recruiter_id=recruiter_id
+        )
+        if existing:
+            results.append(_enrich_assignment(session=session, assignment=existing))
+            continue
+
+        assignment = TicketRecruiterAssignment(
+            ticket_id=ticket_id,
+            recruiter_id=recruiter_id,
+            assigned_by=current_user.id,
+        )
+        assignment = repository.create_recruiter_assignment(
+            session=session, assignment=assignment
+        )
+        results.append(_enrich_assignment(session=session, assignment=assignment))
+
+    return results
+
+
+def remove_recruiter_assignment(
+    *, session: Session, ticket_id: uuid.UUID, recruiter_id: uuid.UUID, current_user: User
+) -> None:
+    """Remove a recruiter from a ticket."""
+    db_ticket = get_ticket(session=session, ticket_id=ticket_id)
+
+    # Verify caller is the assigned team lead or admin
+    if current_user.role != UserRole.ADMIN:
+        if db_ticket.assigned_team_lead_id != current_user.id:
+            raise TicketValidationError(
+                detail="Only the assigned team lead or admin can remove recruiters"
+            )
+
+    assignment = repository.get_recruiter_assignment(
+        session=session, ticket_id=ticket_id, recruiter_id=recruiter_id
+    )
+    if not assignment:
+        raise TicketNotFoundError(detail="Recruiter assignment not found")
+
+    repository.delete_recruiter_assignment(session=session, assignment=assignment)
+
+
+def get_ticket_assignments(
+    *, session: Session, ticket_id: uuid.UUID
+) -> list[TicketAssignmentRead]:
+    """Get all recruiter assignments for a ticket."""
+    get_ticket(session=session, ticket_id=ticket_id)  # validate ticket exists
+    assignments = repository.list_recruiter_assignments(
+        session=session, ticket_id=ticket_id
+    )
+    return [_enrich_assignment(session=session, assignment=a) for a in assignments]
+
+
+def _enrich_assignment(
+    *, session: Session, assignment: TicketRecruiterAssignment
+) -> TicketAssignmentRead:
+    """Enrich an assignment with recruiter user details."""
+    recruiter = session.get(User, assignment.recruiter_id)
+    return TicketAssignmentRead(
+        id=assignment.id,
+        ticket_id=assignment.ticket_id,
+        recruiter_id=assignment.recruiter_id,
+        recruiter_name=recruiter.full_name if recruiter else None,
+        recruiter_email=recruiter.email if recruiter else None,
+        assigned_by=assignment.assigned_by,
+        assigned_at=assignment.assigned_at,
+    )

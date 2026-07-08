@@ -5,7 +5,7 @@ import { useToast } from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
 import EmptyState from '../components/EmptyState';
 import SlideOver from '../components/SlideOver';
-import { RotateCcw } from '../components/icons';
+import { RotateCcw, Trash2 } from '../components/icons';
 
 interface ReopenRequest {
   id: string;
@@ -37,10 +37,16 @@ const ReopenRequests: React.FC = () => {
   const [tickets, setTickets] = useState<Record<string, Ticket>>({});
   const [users, setUsers] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const toast = useToast();
+  const isAdmin = user?.role === 'admin';
 
   const [selectedRequest, setSelectedRequest] = useState<ReopenRequest | null>(null);
+  
+  const [deleteState, setDeleteState] = useState<{
+    isOpen: boolean;
+    requestId: string | null;
+  }>({ isOpen: false, requestId: null });
   
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean;
@@ -119,6 +125,24 @@ const ReopenRequests: React.FC = () => {
     setConfirmState({ isOpen: true, action, requestId });
   };
 
+  const handleDelete = async () => {
+    if (!deleteState.requestId) return;
+    try {
+      await fetchApi(`/tickets/reopen-requests/${deleteState.requestId}`, {
+        method: 'DELETE',
+      });
+      toast.success('Request deleted successfully');
+      loadData();
+      if (selectedRequest?.id === deleteState.requestId) {
+        setSelectedRequest(null);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete request');
+    } finally {
+      setDeleteState({ isOpen: false, requestId: null });
+    }
+  };
+
   if (loading) {
     return (
       <>
@@ -154,7 +178,7 @@ const ReopenRequests: React.FC = () => {
                   <th>Requested By</th>
                   <th>Date</th>
                   <th>Status</th>
-                  {canApprove && <th style={{ textAlign: 'right' }}>Actions</th>}
+                  {(canApprove || isAdmin) && <th style={{ textAlign: 'right' }}>Actions</th>}
                 </tr>
               </thead>
               <tbody>
@@ -172,10 +196,10 @@ const ReopenRequests: React.FC = () => {
                         {r.status.toUpperCase()}
                       </span>
                     </td>
-                    {canApprove && (
+                    {(canApprove || isAdmin) && (
                       <td onClick={e => e.stopPropagation()}>
                         <div className="flex-gap" style={{ justifyContent: 'flex-end' }}>
-                          {r.status === 'pending' && (
+                          {canApprove && r.status === 'pending' && (
                             <>
                               <button 
                                 className="btn btn-outline btn-sm" 
@@ -192,6 +216,16 @@ const ReopenRequests: React.FC = () => {
                                 Reject
                               </button>
                             </>
+                          )}
+                          {isAdmin && (
+                            <button 
+                              className="btn btn-outline btn-sm" 
+                              style={{ padding: '6px', color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                              onClick={() => setDeleteState({ isOpen: true, requestId: r.id })}
+                              title="Delete Record"
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -322,6 +356,15 @@ const ReopenRequests: React.FC = () => {
           />
         </div>
       </ConfirmModal>
+      <ConfirmModal
+        isOpen={deleteState.isOpen}
+        onClose={() => setDeleteState({ isOpen: false, requestId: null })}
+        onConfirm={handleDelete}
+        title="Delete Reopen Request"
+        description="Are you sure you want to delete this reopen request record? This action cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+      />
     </>
   );
 };
