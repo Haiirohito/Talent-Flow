@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AlertTriangle, Trash2, Info, RefreshCcw } from './icons';
 
 type ModalVariant = 'danger' | 'warning' | 'info' | 'success';
@@ -55,6 +55,8 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   loading = false,
   children,
 }) => {
+  const previousOverflowRef = useRef<string>('');
+
   useEffect(() => {
     if (!isOpen) return;
     const handleEsc = (e: KeyboardEvent) => {
@@ -66,11 +68,16 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // Store the previous overflow value before overriding
+      previousOverflowRef.current = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      // Restore the previous overflow value instead of clobbering to 'unset'
+      document.body.style.overflow = previousOverflowRef.current;
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => {
+      document.body.style.overflow = previousOverflowRef.current;
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;

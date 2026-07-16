@@ -11,6 +11,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Users from './pages/Users';
 import Clients from './pages/Clients';
+import Candidates from './pages/Candidates';
 import Tickets from './pages/Tickets';
 import ReopenRequests from './pages/ReopenRequests';
 import InviteUser from './pages/InviteUser';
@@ -40,6 +41,9 @@ const App: React.FC = () => {
                 </Route>
                 <Route element={<PermissionRoute permission="clients:read" />}>
                   <Route path="/clients" element={<Clients />} />
+                </Route>
+                <Route element={<PermissionRoute permission="candidates:read" />}>
+                  <Route path="/candidates" element={<Candidates />} />
                 </Route>
                 <Route element={<PermissionRoute permission="tickets:read" />}>
                   <Route path="/tickets" element={<Tickets />} />

@@ -27,7 +27,7 @@ const Login: React.FC = () => {
         body: formData,
       });
 
-      login(response.access_token);
+      await login(response.access_token);
       navigate('/dashboard');
     } catch (err: any) {
       error(err.message || 'Login failed. Please check your credentials.');

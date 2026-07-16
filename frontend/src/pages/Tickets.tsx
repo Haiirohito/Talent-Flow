@@ -111,11 +111,12 @@ const Tickets: React.FC = () => {
   };
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadData();
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
+    let cancelled = false;
+    const doLoad = async () => {
+      await loadData();
+    };
+    doLoad();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -154,12 +155,16 @@ const Tickets: React.FC = () => {
         body: JSON.stringify({ target_stage: targetStage }),
       });
       toast.success("Ticket stage updated");
-      void loadData();
 
-      // Update selected ticket if it's open
-      if (selectedTicket?.id === ticketId) {
-        const updated = await fetchApi(`/tickets/${ticketId}`);
-        setSelectedTicket(updated);
+      // Refresh list and update detail panel in one flow
+      const [, updatedTicket] = await Promise.all([
+        loadData(),
+        selectedTicket?.id === ticketId
+          ? fetchApi(`/tickets/${ticketId}`)
+          : Promise.resolve(null),
+      ]);
+      if (updatedTicket && selectedTicket?.id === ticketId) {
+        setSelectedTicket(updatedTicket);
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to update ticket stage"));
@@ -178,9 +183,9 @@ const Tickets: React.FC = () => {
       toast.success("Ticket priority updated");
       void loadData();
 
-      // Update selected ticket if it's open
+      // Update selected ticket inline (no extra fetch needed for priority)
       if (selectedTicket?.id === ticketId) {
-        setSelectedTicket({ ...selectedTicket, priority: newPriority });
+        setSelectedTicket((prev) => prev ? { ...prev, priority: newPriority } : null);
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to update priority"));
@@ -194,9 +199,14 @@ const Tickets: React.FC = () => {
         body: JSON.stringify({ team_lead_id: teamLeadId || null }),
       });
       toast.success("Team Lead assignment updated");
-      void loadData();
-      if (selectedTicket?.id === ticketId) {
-        setSelectedTicket(updated);
+      const [, updatedTicket] = await Promise.all([
+        loadData(),
+        selectedTicket?.id === ticketId
+          ? fetchApi(`/tickets/${ticketId}`)
+          : Promise.resolve(null),
+      ]);
+      if (updatedTicket && selectedTicket?.id === ticketId) {
+        setSelectedTicket(updatedTicket);
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to assign team lead"));
@@ -213,10 +223,14 @@ const Tickets: React.FC = () => {
         body: JSON.stringify({ recruiter_ids: [recruiterId] }),
       });
       toast.success("Recruiter assigned");
-      void loadData();
-      if (selectedTicket?.id === ticketId) {
-        const updated = await fetchApi(`/tickets/${ticketId}`);
-        setSelectedTicket(updated);
+      const [, updatedTicket] = await Promise.all([
+        loadData(),
+        selectedTicket?.id === ticketId
+          ? fetchApi(`/tickets/${ticketId}`)
+          : Promise.resolve(null),
+      ]);
+      if (updatedTicket && selectedTicket?.id === ticketId) {
+        setSelectedTicket(updatedTicket);
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to assign recruiter"));
@@ -232,10 +246,14 @@ const Tickets: React.FC = () => {
         method: "DELETE",
       });
       toast.success("Recruiter removed");
-      void loadData();
-      if (selectedTicket?.id === ticketId) {
-        const updated = await fetchApi(`/tickets/${ticketId}`);
-        setSelectedTicket(updated);
+      const [, updatedTicket] = await Promise.all([
+        loadData(),
+        selectedTicket?.id === ticketId
+          ? fetchApi(`/tickets/${ticketId}`)
+          : Promise.resolve(null),
+      ]);
+      if (updatedTicket && selectedTicket?.id === ticketId) {
+        setSelectedTicket(updatedTicket);
       }
     } catch (err: unknown) {
       toast.error(getErrorMessage(err, "Failed to remove recruiter"));
@@ -489,7 +507,8 @@ const Tickets: React.FC = () => {
                       try {
                         const enriched = await fetchApi(`/tickets/${t.id}`);
                         setSelectedTicket(enriched);
-                      } catch {
+                      } catch (err: unknown) {
+                        toast.warning("Could not load full ticket details.");
                         setSelectedTicket(t);
                       }
                     }}

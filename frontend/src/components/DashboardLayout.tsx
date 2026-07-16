@@ -3,7 +3,7 @@ import { NavLink, useNavigate, Outlet } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { 
   Home, Users, UserPlus, User, Briefcase, Ticket, 
-  Shield, Mail, Settings, LogOut, Menu, X, RotateCcw
+  Shield, Mail, Settings, LogOut, Menu, X, RotateCcw, UserCheck
 } from './icons';
 
 const DashboardLayout: React.FC = () => {
@@ -27,6 +27,7 @@ const DashboardLayout: React.FC = () => {
   const canInviteUsers = hasPermission('users:invite');
   const canViewAdmin = hasPermission('dashboard:admin');
   const canViewClients = hasPermission('clients:read');
+  const canViewCandidates = hasPermission('candidates:read');
   const canViewTickets = hasPermission('tickets:read');
   const canApproveReopens = hasPermission('tickets:reopen_approve');
   const canManageTeam = hasPermission('team:manage');
@@ -45,7 +46,7 @@ const DashboardLayout: React.FC = () => {
       )}
 
       {/* Mobile Top Bar */}
-      <div className="mobile-top-bar" style={{ display: 'none' /* Will be handled in CSS for mobile view */ }}>
+      <div className="mobile-top-bar">
         <button className="btn-icon" onClick={() => setSidebarOpen(true)}>
           <Menu />
         </button>
@@ -146,9 +147,10 @@ const DashboardLayout: React.FC = () => {
             </>
           )}
 
-          {canViewClients && (
+          {(canViewClients || canViewCandidates) && (
             <>
               <span className="sidebar-section-label">Relationships</span>
+              {canViewClients && (
               <NavLink
                 to="/clients"
                 className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
@@ -157,6 +159,17 @@ const DashboardLayout: React.FC = () => {
                 <Briefcase />
                 Clients
               </NavLink>
+              )}
+              {canViewCandidates && (
+              <NavLink
+                to="/candidates"
+                className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <UserCheck />
+                Candidates
+              </NavLink>
+              )}
             </>
           )}
 

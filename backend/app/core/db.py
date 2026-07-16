@@ -6,7 +6,12 @@ from app.users import crud
 from app.users.models import User
 from app.users.schemas import UserCreate
 
-engine = create_engine(str(settings.SQLALCHEMY_DATABASE_URI))
+engine = create_engine(
+    str(settings.SQLALCHEMY_DATABASE_URI),
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+)
 
 
 def init_db(session: Session) -> None:

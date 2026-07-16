@@ -10,7 +10,7 @@ interface SlideOverProps {
   mode?: 'modal' | 'non-modal';
 }
 
-const CLOSE_ANIMATION_MS = 400;
+const CLOSE_ANIMATION_MS = 350; // Matches CSS slideOutRight duration
 
 const SlideOver: React.FC<SlideOverProps> = ({
   isOpen,
@@ -23,10 +23,21 @@ const SlideOver: React.FC<SlideOverProps> = ({
   const [render, setRender] = useState(isOpen);
   const isModal = mode === 'modal';
   const panelRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+
+  // Track mount state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Handle click outside
   useEffect(() => {
     if (!isOpen) return;
+
+    let listenerId: number | null = null;
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Element;
@@ -34,17 +45,21 @@ const SlideOver: React.FC<SlideOverProps> = ({
       if (panelRef.current && panelRef.current.contains(target)) return;
       // Ignore clicks on popups like modals and toasts that render outside
       if (target.closest('.modal-overlay, .modal, .toast-container, .toast')) return;
-      
+
       onClose();
     };
 
     // Use slight delay before attaching so that the click that opened the panel doesn't close it
-    const timeoutId = window.setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+    listenerId = window.setTimeout(() => {
+      if (mountedRef.current) {
+        document.addEventListener('mousedown', handleClickOutside);
+      }
     }, 0);
 
     return () => {
-      window.clearTimeout(timeoutId);
+      if (listenerId !== null) {
+        window.clearTimeout(listenerId);
+      }
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen, onClose]);
@@ -53,7 +68,7 @@ const SlideOver: React.FC<SlideOverProps> = ({
     if (!isOpen) return;
 
     const timeoutId = window.setTimeout(() => {
-      setRender(true);
+      if (mountedRef.current) setRender(true);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -63,7 +78,7 @@ const SlideOver: React.FC<SlideOverProps> = ({
     if (isOpen || !render) return;
 
     const timeoutId = window.setTimeout(() => {
-      setRender(false);
+      if (mountedRef.current) setRender(false);
     }, CLOSE_ANIMATION_MS);
 
     return () => window.clearTimeout(timeoutId);
@@ -108,7 +123,7 @@ const SlideOver: React.FC<SlideOverProps> = ({
           style={{ animation: isOpen ? 'fadeIn 0.2s ease forwards' : 'fadeIn 0.2s ease reverse forwards' }}
         />
       )}
-      <div 
+      <div
         ref={panelRef}
         className={`slide-over ${variant === 'wide' ? 'slide-over-wide' : ''}`}
         style={{ animation: isOpen ? 'slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'slideOutRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}

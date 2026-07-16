@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fetchApi } from '../api/client';
 import { canModifyUser as canModifyUserByRole } from '../utils/roleUtils';
 
@@ -34,7 +34,7 @@ interface AuthContextType {
   dashboard: DashboardData | null;
   permissions: string[];
   isAuthenticated: boolean;
-  login: (token: string) => void;
+  login: (token: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
   hasPermission: (perm: string) => boolean;
@@ -50,8 +50,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
+    // Guard against concurrent fetchUser calls
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+
     try {
       const [userData, dashData] = await Promise.all([
         fetchApi('/users/me'),
@@ -65,9 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       setDashboard(null);
     } finally {
+      fetchingRef.current = false;
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -76,23 +82,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [fetchUser]);
 
-  const login = (token: string) => {
+  const login = useCallback(async (token: string) => {
     localStorage.setItem('access_token', token);
-    fetchUser();
-  };
+    setLoading(true);
+    await fetchUser();
+  }, [fetchUser]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('access_token');
     setUser(null);
     setDashboard(null);
-  };
+  }, []);
 
   const permissions = dashboard?.permissions ?? [];
 
-  const hasPermission = (perm: string) => permissions.includes(perm);
-  const hasAnyPermission = (...perms: string[]) => perms.some(p => permissions.includes(p));
+  const hasPermission = useCallback((perm: string) => permissions.includes(perm), [permissions]);
+  const hasAnyPermission = useCallback((...perms: string[]) => perms.some(p => permissions.includes(p)), [permissions]);
 
   /** Check if the current user can modify a user with the given target role. */
   const canModifyUser = useCallback(

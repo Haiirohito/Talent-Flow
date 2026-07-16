@@ -68,6 +68,12 @@ class Permission(StrEnum):
     CLIENTS_UPDATE = "clients:update"
     CLIENTS_DELETE = "clients:delete"
 
+    # Candidate management
+    CANDIDATES_READ = "candidates:read"
+    CANDIDATES_CREATE = "candidates:create"
+    CANDIDATES_UPDATE = "candidates:update"
+    CANDIDATES_DELETE = "candidates:delete"
+
     # Team management
     TEAM_MANAGE = "team:manage"
 
@@ -103,6 +109,9 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.CLIENTS_READ,
         Permission.CLIENTS_CREATE,
         Permission.TEAM_MANAGE,
+        Permission.CANDIDATES_READ,
+        Permission.CANDIDATES_CREATE,
+        Permission.CANDIDATES_UPDATE,
     },
     UserRole.RECRUITER: {
         Permission.USERS_READ,
@@ -113,6 +122,8 @@ ROLE_PERMISSIONS: dict[UserRole, set[Permission]] = {
         Permission.TICKETS_READ,
         Permission.TICKETS_UPDATE,
         Permission.CLIENTS_READ,
+        Permission.CANDIDATES_READ,
+        Permission.CANDIDATES_UPDATE,
     },
     UserRole.EMPLOYEE: {
         Permission.PROFILE_READ,

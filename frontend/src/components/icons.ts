@@ -92,4 +92,10 @@ export {
   Heart,
   Star,
   Sparkles,
+
+  // Candidates
+  UserCheck,
+  Upload,
+  Download,
+  FilePlus2,
 } from 'lucide-react';

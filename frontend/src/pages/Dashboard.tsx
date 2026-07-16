@@ -70,17 +70,19 @@ const Dashboard: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const loadStats = async () => {
       try {
         const data = await fetchApi('/dashboard/stats');
-        setStats(data);
+        if (!cancelled) setStats(data);
       } catch (err) {
-        console.error('Failed to load dashboard stats', err);
+        if (!cancelled) console.error('Failed to load dashboard stats', err);
       } finally {
-        setStatsLoading(false);
+        if (!cancelled) setStatsLoading(false);
       }
     };
     loadStats();
+    return () => { cancelled = true; };
   }, []);
 
   const getGreeting = () => {

@@ -5,7 +5,7 @@ Workflow actions (stage/status transitions) have dedicated endpoints.
 """
 
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -194,7 +194,7 @@ def list_reopen_requests(
     response_model=TicketReopenRequestRead,
 )
 def review_reopen_request(
-    *, session: SessionDep, current_user: CurrentUser, request_id: uuid.UUID, body: TicketReopenReview, action: str = Query(...)  # noqa: E501
+    *, session: SessionDep, current_user: CurrentUser, request_id: uuid.UUID, body: TicketReopenReview, action: Literal["approve", "reject"] = Query(...)  # noqa: E501
 ) -> Any:
     """Review a reopen request (approve or reject)."""
     return service.review_reopen_request(
@@ -210,6 +210,8 @@ def delete_reopen_request(
 ) -> Any:
     """Delete a reopen request (Admin only)."""
     return service.delete_reopen_request(session=session, request_id=request_id)
+
+
 @router.post(
     "/{ticket_id}/hold",
     dependencies=[Depends(require_permissions(Permission.TICKETS_UPDATE))],

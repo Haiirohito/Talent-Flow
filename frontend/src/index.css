@@ -2564,3 +2564,217 @@ code {
   color: var(--color-text-muted);
   opacity: 0.3;
 }
+
+/* ═══════════════════════════════════════════
+   CANDIDATES — Skills Tag Input
+   ═══════════════════════════════════════════ */
+
+.skills-tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  min-height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-surface);
+  cursor: text;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  align-items: center;
+}
+
+.skills-tag-input:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.skills-tag-input-field {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--color-text);
+  flex: 1;
+  min-width: 100px;
+  padding: 2px 0;
+}
+
+.skills-tag-input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.skill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  animation: scaleIn 0.15s ease;
+}
+
+.skill-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 50%;
+  color: var(--color-primary);
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.skill-tag-remove:hover {
+  opacity: 1;
+  background: rgba(99, 102, 241, 0.15);
+}
+
+/* Skills in table cells */
+.skills-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.skill-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.skill-pill-more {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-muted);
+}
+
+/* Skills in detail panel */
+.skills-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.skill-pill-detail {
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  border-radius: 16px;
+}
+
+.form-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════════
+   CANDIDATES — Resume Upload
+   ═══════════════════════════════════════════ */
+
+.resume-upload-area {
+  margin-top: 2px;
+}
+
+.resume-upload-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+  width: 100%;
+  justify-content: center;
+}
+
+.resume-upload-button:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.resume-file-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--color-primary-soft);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.82rem;
+  color: var(--color-primary);
+}
+
+.resume-file-existing {
+  background: var(--color-success-soft);
+  border-color: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+}
+
+.resume-file-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* Resume indicator in table */
+.resume-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════
+   CANDIDATES — Resume PDF Viewer
+   ═══════════════════════════════════════════ */
+
+.resume-viewer-container {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  background: var(--color-bg-subtle);
+  position: relative;
+}
+
+.resume-viewer-iframe {
+  width: 100%;
+  height: 500px;
+  border: none;
+  display: block;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

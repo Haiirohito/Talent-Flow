@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import clients, dashboard, email, login, private, teams, tickets, users, utils
+from app.api.routes import candidates, clients, dashboard, email, login, private, teams, tickets, users, utils
 from app.core.config import settings
 
 api_router = APIRouter()
@@ -11,6 +11,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(email.router)
 api_router.include_router(tickets.router)
 api_router.include_router(clients.router)
+api_router.include_router(candidates.router)
 api_router.include_router(teams.router)
 
 

@@ -6,6 +6,7 @@ Pure database operations. No business logic.
 import uuid
 from datetime import datetime, timezone
 
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 from app.ticket.models import RequirementTicket, TicketRecruiterAssignment, TicketReopenRequest
@@ -20,7 +21,7 @@ def create_ticket(*, session: Session, ticket: RequirementTicket) -> Requirement
     return ticket
 
 
-def get_ticket(*, session: Session, ticket_id) -> RequirementTicket | None:
+def get_ticket(*, session: Session, ticket_id: uuid.UUID) -> RequirementTicket | None:
     """Retrieve a single ticket by its UUID (excludes soft-deleted)."""
     statement = select(RequirementTicket).where(
         RequirementTicket.id == ticket_id,
@@ -52,14 +53,11 @@ def list_tickets(
     - recruiter_id: only tickets where this recruiter is assigned
     - team_lead_id: only tickets assigned to this team lead OR created by them
     """
-    from sqlalchemy import or_
-
     statement = (
         select(RequirementTicket)
         .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
     )
     if recruiter_id:
-        from app.ticket.models import TicketRecruiterAssignment
         statement = statement.join(
             TicketRecruiterAssignment,
             RequirementTicket.id == TicketRecruiterAssignment.ticket_id
@@ -83,15 +81,12 @@ def count_tickets(
     team_lead_id: uuid.UUID | None = None,
 ) -> int:
     """Return the total number of non-deleted tickets (matching same filters as list_tickets)."""
-    from sqlalchemy import or_
-
     statement = (
         select(func.count())
         .select_from(RequirementTicket)
         .where(RequirementTicket.deleted_at.is_(None))  # type: ignore[union-attr]
     )
     if recruiter_id:
-        from app.ticket.models import TicketRecruiterAssignment
         statement = statement.join(
             TicketRecruiterAssignment,
             RequirementTicket.id == TicketRecruiterAssignment.ticket_id
@@ -129,7 +124,7 @@ def save_ticket(*, session: Session, ticket: RequirementTicket) -> RequirementTi
 
 
 def soft_delete_ticket(
-    *, session: Session, db_ticket: RequirementTicket, deleted_by_id
+    *, session: Session, db_ticket: RequirementTicket, deleted_by_id: uuid.UUID
 ) -> RequirementTicket:
     """Mark a ticket as deleted (soft delete) with audit trail."""
     db_ticket.deleted_at = datetime.now(timezone.utc)
@@ -170,7 +165,7 @@ def create_reopen_request(*, session: Session, request: TicketReopenRequest) -> 
     return request
 
 
-def get_reopen_request(*, session: Session, request_id) -> TicketReopenRequest | None:
+def get_reopen_request(*, session: Session, request_id: uuid.UUID) -> TicketReopenRequest | None:
     return session.get(TicketReopenRequest, request_id)
 
 
@@ -217,7 +212,7 @@ def create_recruiter_assignment(
 
 
 def get_recruiter_assignment(
-    *, session: Session, ticket_id, recruiter_id
+    *, session: Session, ticket_id: uuid.UUID, recruiter_id: uuid.UUID
 ) -> TicketRecruiterAssignment | None:
     statement = select(TicketRecruiterAssignment).where(
         TicketRecruiterAssignment.ticket_id == ticket_id,
@@ -227,7 +222,7 @@ def get_recruiter_assignment(
 
 
 def list_recruiter_assignments(
-    *, session: Session, ticket_id
+    *, session: Session, ticket_id: uuid.UUID
 ) -> list[TicketRecruiterAssignment]:
     statement = (
         select(TicketRecruiterAssignment)
@@ -244,7 +239,7 @@ def delete_recruiter_assignment(
     session.commit()
 
 
-def delete_all_recruiter_assignments(*, session: Session, ticket_id) -> None:
+def delete_all_recruiter_assignments(*, session: Session, ticket_id: uuid.UUID) -> None:
     """Remove all recruiter assignments for a ticket."""
     statement = select(TicketRecruiterAssignment).where(
         TicketRecruiterAssignment.ticket_id == ticket_id

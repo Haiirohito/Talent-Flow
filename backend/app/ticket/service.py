@@ -5,13 +5,32 @@ Stage and status changes are delegated to the workflow layer.
 """
 
 import uuid
+from datetime import datetime, timezone
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.client.models import Client
+from app.team.models import TeamMember
 from app.ticket import repository
-from app.ticket.models import RequirementTicket, TicketStage, TicketStatus
-from app.ticket.schemas import TicketCreate, TicketsPublic, TicketUpdate
+from app.ticket.models import (
+    ReopenRequestStatus,
+    RequirementTicket,
+    TicketRecruiterAssignment,
+    TicketReopenRequest,
+    TicketStage,
+    TicketStatus,
+)
+from app.ticket.schemas import (
+    TicketAssignmentRead,
+    TicketAssignRecruiters,
+    TicketAssignTeamLead,
+    TicketCreate,
+    TicketReopenCreate,
+    TicketReopenRequestsPublic,
+    TicketReopenReview,
+    TicketsPublic,
+    TicketUpdate,
+)
 from app.ticket.utils import generate_ticket_number
 from app.ticket.workflow import ticket_workflow
 from app.ticket.workflow.exceptions import TicketNotFoundError, TicketValidationError
@@ -213,8 +232,7 @@ def get_ticket_with_transitions(*, session: Session, ticket_id: uuid.UUID) -> di
     else:
         ticket_data["assigned_team_lead_name"] = None
 
-    # Assigned recruiters — fixed N+1: call session.get once per recruiter
-    from app.ticket.models import TicketRecruiterAssignment
+    # Assigned recruiters
     assignments = repository.list_recruiter_assignments(
         session=session, ticket_id=ticket_id
     )
@@ -236,10 +254,6 @@ def get_ticket_with_transitions(*, session: Session, ticket_id: uuid.UUID) -> di
 # ---------------------------------------------------------------------------
 # Reopen Request
 # ---------------------------------------------------------------------------
-
-from app.ticket.models import TicketReopenRequest, ReopenRequestStatus
-from app.ticket.schemas import TicketReopenCreate, TicketReopenReview, TicketReopenRequestsPublic
-from datetime import datetime, timezone
 
 
 def request_reopen(*, session: Session, ticket_id: uuid.UUID, request_in: TicketReopenCreate, current_user: User) -> TicketReopenRequest:
@@ -280,7 +294,7 @@ def review_reopen_request(*, session: Session, request_id: uuid.UUID, review_in:
     elif action == "reject":
         req.status = ReopenRequestStatus.REJECTED
     else:
-        raise TicketValidationError(detail="Invalid action")
+        raise TicketValidationError(detail="Invalid action. Must be 'approve' or 'reject'.")
         
     req.reviewed_by = current_user.id
     req.review_notes = review_in.notes
@@ -302,19 +316,13 @@ def delete_reopen_request(*, session: Session, request_id: uuid.UUID) -> None:
 # Ticket Assignment
 # ---------------------------------------------------------------------------
 
-from app.ticket.models import TicketRecruiterAssignment
-from app.ticket.schemas import TicketAssignTeamLead, TicketAssignRecruiters, TicketAssignmentRead
-from app.users.models import UserRole
-from app.team.models import TeamMember
-
 
 def assign_team_lead(
     *, session: Session, ticket_id: uuid.UUID, body: TicketAssignTeamLead, current_user: User
 ) -> RequirementTicket:
     """Assign (or unassign) a team lead to a ticket."""
     if current_user.role != UserRole.ADMIN:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="Only admins can change the team lead assigned to a ticket.")
+        raise TicketValidationError(detail="Only admins can change the team lead assigned to a ticket.")
 
     db_ticket = get_ticket(session=session, ticket_id=ticket_id)
 
@@ -346,7 +354,6 @@ def assign_recruiters(
                 detail="Only the assigned team lead or admin can assign recruiters"
             )
 
-    from sqlmodel import select
     results = []
     for recruiter_id in body.recruiter_ids:
         # Validate recruiter exists and is a recruiter

@@ -2,9 +2,21 @@
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+from sqlalchemy import or_
+from sqlmodel import col, func, select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.client.models import Client
 from app.core.permissions import Permission, UserRole, get_user_permissions
+from app.team.models import TeamMember
+from app.ticket.models import (
+    ReopenRequestStatus,
+    RequirementTicket,
+    TicketRecruiterAssignment,
+    TicketReopenRequest,
+    TicketStatus,
+)
+from app.users.models import User
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -158,19 +170,6 @@ def get_dashboard_stats(
     session: SessionDep,
 ) -> DashboardStats:
     """Return real-time aggregated stats tailored to the user's role."""
-    from sqlalchemy import or_
-    from sqlmodel import col, func, select
-
-    from app.client.models import Client
-    from app.team.models import TeamMember
-    from app.ticket.models import (
-        RequirementTicket,
-        TicketRecruiterAssignment,
-        TicketReopenRequest,
-        ReopenRequestStatus,
-        TicketStatus,
-    )
-    from app.users.models import User
 
     stats = DashboardStats()
     role = current_user.role
